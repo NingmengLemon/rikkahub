@@ -56,7 +56,6 @@ import coil3.request.crossfade
 import coil3.svg.SvgDecoder
 import me.rerere.ui.toast.Toaster
 import me.rerere.ui.toast.rememberToasterState
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.db.DatabaseMigrationTracker
