@@ -235,7 +235,6 @@ class RouteActivity : ComponentActivity() {
         LaunchedEffect(Unit) {
             eventBus.events.collect { event ->
                 when (event) {
-                    is AppEvent.Speak -> Unit // 语音合成已移除
                     is AppEvent.OpenUsageAccessSettings -> this@RouteActivity.openUsageAccessSettings()
                     is AppEvent.ChatGenerationUpdate -> Unit // 由 ChatNotificationManager 消费
                     is AppEvent.ChatGenerationEnded -> Unit // 由 ChatNotificationManager 消费

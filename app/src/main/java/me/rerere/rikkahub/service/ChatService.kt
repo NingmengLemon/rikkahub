@@ -4,12 +4,9 @@ import android.app.Application
 import android.util.Log
 import androidx.core.net.toUri
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.completeWith
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -248,11 +245,6 @@ class ChatService(
 
     private fun onSessionGenerationFinished(session: ConversationSession, cause: Throwable?) {
         if (cause != null) session.messageQueue.pause()
-        if (session.state.value.currentMessages.any { message ->
-                message.parts.any { it is UIMessagePart.Tool && it.isPending }
-            }) {
-            session.messageQueue.failReplyWaiters(context.getString(R.string.chat_page_voice_tool_approval))
-        }
         appScope.launch { dispatchNextQueuedMessage(session.id) }
     }
 
@@ -398,25 +390,6 @@ class ChatService(
         }
     }
 
-    /** Enqueue immediately; the result belongs to this item even after edits or later turns. */
-    fun enqueueVoiceMessage(conversationId: Uuid, text: String): Deferred<String?> {
-        val session = sessionManager.getOrCreate(conversationId)
-        val reply = CompletableDeferred<String?>()
-        synchronized(session) {
-            check(text.isNotBlank()) { context.getString(R.string.chat_page_voice_empty) }
-            check(!session.messageQueue.state.value.paused || session.messageQueue.state.value.messages.isEmpty()) {
-                context.getString(R.string.chat_page_voice_resume_queue)
-            }
-            check(session.state.value.currentMessages.none { message ->
-                message.parts.any { it is UIMessagePart.Tool && it.isPending }
-            }) { context.getString(R.string.chat_page_voice_tools_before_resume) }
-            if (session.messageQueue.state.value.messages.isEmpty()) session.messageQueue.resume()
-            session.messageQueue.enqueue(listOf(UIMessagePart.Text(text)), reply = reply)
-            dispatchNextQueuedMessage(conversationId)
-        }
-        return reply
-    }
-
     private fun dispatchNextQueuedMessage(conversationId: Uuid): Job? {
         val session = sessionManager.get(conversationId) ?: return null
         synchronized(session) {
@@ -462,21 +435,8 @@ class ChatService(
                     handleMessageComplete(conversationId)
                 }
 
-                queued.reply?.completeWith(runCatching {
-                    val messages = session.state.value.currentMessages
-                    check(!session.messageQueue.state.value.paused) { context.getString(R.string.chat_page_voice_generation_failed) }
-                    check(messages.none { message -> message.parts.any { it is UIMessagePart.Tool && it.isPending } }) {
-                        context.getString(R.string.chat_page_voice_tool_approval)
-                    }
-                    val previousIds = currentConversation.currentMessages.map { it.id }.toSet()
-                    messages.filter { it.id !in previousIds && it.role == MessageRole.ASSISTANT }
-                        .joinToString("\n") { it.toText() }
-                })
-                // Voice owns playback, including when its observer has already left the page.
-                // The ordinary autoplay collector must not read a late voice reply again.
-                if (queued.reply == null) _generationDoneFlow.emit(conversationId)
+                _generationDoneFlow.emit(conversationId)
             } catch (e: Exception) {
-                queued.reply?.completeExceptionally(e)
                 e.printStackTrace()
                 if (e is CancellationException) throw e
                 session.messageQueue.pause()
@@ -484,7 +444,6 @@ class ChatService(
             }
         }
         job.invokeOnCompletion { cause ->
-            if (cause != null) queued.reply?.completeExceptionally(cause)
             synchronized(session) {
                 if (session.submittingMessage?.id == queued.id) session.submittingMessage = null
             }
