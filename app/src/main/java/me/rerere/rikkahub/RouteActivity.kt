@@ -40,7 +40,6 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -64,8 +63,6 @@ import me.rerere.rikkahub.data.db.DatabaseMigrationTracker
 import me.rerere.rikkahub.data.db.MigrationState
 import me.rerere.rikkahub.data.event.AppEvent
 import me.rerere.rikkahub.data.event.AppEventBus
-import me.rerere.rikkahub.data.repository.MediaCreationRepository
-import me.rerere.rikkahub.service.MediaCreationForegroundService
 import me.rerere.rikkahub.ui.activity.SafeModeActivity
 import me.rerere.rikkahub.ui.components.ui.TTSController
 import me.rerere.rikkahub.ui.context.LocalASRState
@@ -104,10 +101,7 @@ import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceTerminalPage
 import me.rerere.workspace.WorkspaceStorageArea
 import me.rerere.rikkahub.ui.pages.favorite.FavoritePage
 import me.rerere.rikkahub.ui.pages.history.HistoryPage
-import me.rerere.rikkahub.ui.pages.imggen.ImageGenPage
 import me.rerere.rikkahub.ui.pages.log.LogPage
-import me.rerere.rikkahub.ui.pages.mediacreation.MediaCreationPage
-import me.rerere.rikkahub.ui.pages.mediacreation.MediaCreationSessionsPage
 import me.rerere.rikkahub.ui.pages.search.SearchPage
 import me.rerere.rikkahub.ui.pages.setting.SettingAboutPage
 import me.rerere.rikkahub.ui.pages.setting.SettingPreferencesPage
@@ -144,12 +138,10 @@ import kotlin.uuid.Uuid
 
 private const val TAG = "RouteActivity"
 private const val ACTION_TRANSLATE = "me.rerere.rikkahub.action.TRANSLATE"
-private const val ACTION_MEDIA_CREATION = "me.rerere.rikkahub.action.MEDIA_CREATION"
 
 class RouteActivity : ComponentActivity() {
     private val okHttpClient by inject<OkHttpClient>()
     private val settingsStore by inject<SettingsStore>()
-    private val mediaCreationRepository by inject<MediaCreationRepository>()
     private var navStack: MutableList<NavKey>? = null
     private val pendingIntents = ArrayDeque<Intent>()
 
@@ -227,10 +219,6 @@ class RouteActivity : ComponentActivity() {
         }
         val destination = when (intent.action) {
             ACTION_TRANSLATE -> Screen.Translator
-            ACTION_MEDIA_CREATION -> {
-                openNewMediaCreation(backStack)
-                null
-            }
             Intent.ACTION_SEND -> Screen.ShareHandler(
                 text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty(),
                 streamUri = intent.getStringExtra(Intent.EXTRA_STREAM),
@@ -238,26 +226,11 @@ class RouteActivity : ComponentActivity() {
             Intent.ACTION_PROCESS_TEXT -> Screen.ShareHandler(
                 text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString().orEmpty(),
             )
-            else -> mediaCreationDestination(intent)
-                ?: intent.getStringExtra("conversationId")?.let { Screen.Chat(it) }
+            else -> intent.getStringExtra("conversationId")?.let { Screen.Chat(it) }
         }
         if (destination != null && backStack.lastOrNull() != destination) {
             backStack.add(destination)
         }
-    }
-
-    // 快捷方式没有指定会话，打开一个空会话
-    private fun openNewMediaCreation(backStack: MutableList<NavKey>) {
-        lifecycleScope.launch {
-            val destination = Screen.MediaCreation(mediaCreationRepository.newSession().id.toString())
-            if (backStack.lastOrNull() != destination) backStack.add(destination)
-        }
-    }
-
-    // 媒体创作的通知带着会话 ID，点击后直接打开那个会话
-    private fun mediaCreationDestination(intent: Intent): Screen? {
-        val sessionId = intent.getStringExtra(MediaCreationForegroundService.EXTRA_MEDIA_SESSION_ID) ?: return null
-        return runCatching { Uuid.parse(sessionId) }.getOrNull()?.let { Screen.MediaCreation(it.toString()) }
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
@@ -416,18 +389,6 @@ class RouteActivity : ComponentActivity() {
 
                             entry<Screen.Backup> {
                                 BackupPage()
-                            }
-
-                            entry<Screen.ImageGen> {
-                                ImageGenPage()
-                            }
-
-                            entry<Screen.MediaCreationSessions> {
-                                MediaCreationSessionsPage()
-                            }
-
-                            entry<Screen.MediaCreation> { key ->
-                                MediaCreationPage(key.id)
                             }
 
                             entry<Screen.WebView> { key ->
@@ -682,15 +643,6 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object Backup : Screen
-
-    @Serializable
-    data object ImageGen : Screen
-
-    @Serializable
-    data object MediaCreationSessions : Screen
-
-    @Serializable
-    data class MediaCreation(val id: String) : Screen
 
     @Serializable
     data class WebView(val url: String = "", val contentId: String = "") : Screen

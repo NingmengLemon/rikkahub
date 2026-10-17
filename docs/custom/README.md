@@ -1,6 +1,6 @@
 # 定制分支
 
-本仓库基于上游 [rikkahub/rikkahub](https://github.com/rikkahub/rikkahub) 维护一组个人定制：去掉不需要的功能，补充少量小功能。
+本仓库基于上游 [rikkahub/rikkahub](https://github.com/rikkahub/rikkahub) 维护一组个人定制：去掉不需要的功能，以及按需补充的小功能。
 
 定制与上游持续同步，因此这里记录的不是一次性改动，而是长期维护所需的约定：分支模型、同步流程、改动边界、以及每项定制的落点。
 
@@ -66,9 +66,30 @@ $env:JAVA_HOME='E:\WorkBench\Java\jdk-23.0.2'; $env:PATH="$env:JAVA_HOME\bin;$en
 git log --oneline master..custom
 ```
 
+### Review 门禁
+
+每批较大改动完成后，推送前必须过一次独立 review。目的是用干净上下文复核实现者的判断，避免实现者给自己打分。
+
+- 用 `subagent` 派发，不要用 `subagent_fork`。fork 会继承实现这批改动的对话上下文，失去独立视角的意义。
+- 在派发的 prompt 里要求子代理先加载 `code-review` 技能，再按其流程执行。
+- review 基线取 `master..custom`，即本批定制相对上游的全部改动。
+- 关注三件事：是否引入回归、是否触碰已存储数据的结构、是否符合本文件的定制原则（尤其是是否用了删除实现而非断入口）。
+- 未通过就修复后重跑，不得带病推送。通过后才允许 `git push origin custom`。
+
 ### 避开上游热区
 
-`GenerationLoop.kt`、`ChatService.kt`、`FilesPicker.kt` 最近被上游高频修改（工具调用统计、上下文压缩、输入面板），在这些文件里做定制冲突成本最高。能放到别的层就不要放这里。
+按 `master` 最近 200 个提交统计的文件改动频次（2026-10-17 实测）：
+
+| 文件 | 提交数 |
+| --- | --- |
+| `ChatVM.kt` | 172 |
+| `RouteActivity.kt` | 115 |
+| `ChatService.kt` | 109 |
+| `ChatDrawer.kt` | 37 |
+| `FilesPicker.kt` | 14 |
+| `GenerationLoop.kt` | 7 |
+
+频次越高，定制在下次同步时冲突的可能性越大。C1 与 C2 恰好动了最热的 `ChatVM.kt` 与 `RouteActivity.kt`，因此它们的「合并注意」列写明了具体冲突点，合并时优先看那两行。
 
 上游另有两个长期未合并的重构分支 `refactor/chat-service`（停在 08-26）与 `refactor/ai-stream`（停在 08-12）。它们目前不构成冲突来源，但若上游重启这类重构，上述文件会整体重写，届时应暂停对热区的新定制。
 
@@ -78,7 +99,8 @@ git log --oneline master..custom
 
 | 编号 | 内容 | 落点 | 理由 | 合并注意 |
 | --- | --- | --- | --- | --- |
-| 暂无 | | | | |
+| C1 | 移除媒体创作与生图 | `RouteActivity`（路由、`Screen` 定义、intent 处理）、`ChatDrawer`（侧边栏两个入口）、`ViewModelModule`、`RikkaHubApp`（启动恢复）、`SettingPage`（媒体设置入口）、`shortcuts.xml`、`AndroidManifest`；删除 `ui/pages/mediacreation` 与 `ui/pages/imggen` | 不使用 | 数据层刻意保留未动：`MediaCreationEntity`、`MediaCreationDAO`、`MediaCreationRepository`、`MediaCreationService`、`AppModule` 注册、`Settings.mediaGenerationProviders`、`SettingMediaPage`，上游改这些不需处理。两处冲突风险：上游若重排 `RouteActivity` 的 `Screen` 与 entry 列表；以及上游 `feat/mediagen` 分支（16 提交，2026-10-05 仍有活动）正在改 `MediaCreationService.kt` 与被删除的 mediacreation UI，合并时按该分支进度判断是否要恢复部分实现 |
+| C2 | 移除 Firebase Analytics | `app/build.gradle.kts`、`AppModule`、`ChatVM`、`ViewModelModule` | 自用不需要埋点上报 | Crashlytics 保留，`google-services` 插件与 `google-services.json` 仍需存在。上游若增删 `ChatVM` 构造参数，`ViewModelModule` 里的显式传参会冲突 |
 
 ## 构建
 

@@ -38,7 +38,6 @@ import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.sync.BackupManager
 import me.rerere.rikkahub.data.sync.RestoreFailedException
 import me.rerere.rikkahub.utils.JsonInstant
-import me.rerere.rikkahub.service.MediaCreationService
 import me.rerere.rikkahub.service.WebServerService
 import me.rerere.rikkahub.utils.CrashHandler
 import me.rerere.rikkahub.utils.DatabaseUtil
@@ -108,24 +107,12 @@ class RikkaHubApp : Application() {
         // Start WebServer if enabled in settings
         startWebServerIfEnabled()
 
-        // Resume media generations interrupted by the last process death
-        resumeMediaCreations()
         resumeMemoryConsolidation()
 
         // Increment launch count
         incrementLaunchCount()
 
         // Composer.setDiagnosticStackTraceMode(ComposeStackTraceMode.Auto)
-    }
-
-    private fun resumeMediaCreations() {
-        get<AppScope>().launch(Dispatchers.IO) {
-            runCatching {
-                get<MediaCreationService>().resumePending()
-            }.onFailure {
-                Log.e(TAG, "resumeMediaCreations failed", it)
-            }
-        }
     }
 
     private fun resumeMemoryConsolidation() {

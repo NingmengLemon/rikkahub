@@ -105,3 +105,6 @@ This repository carries personal customizations on top of upstream `rikkahub/rik
 - Do not change persisted data structures: no Room schema changes, no changes to the meaning of existing DataStore
   keys, no changes to existing serialized field meanings. New serialized fields must carry a default.
 - Prefer disabling an entry point over deleting an implementation, so upstream merges stay cheap.
+- Before pushing a batch of customizations, run an independent review: dispatch a fresh-context `subagent` (not
+  `subagent_fork`) and have it load the `code-review` skill, reviewing `master..custom`. Fix what it finds and re-run
+  until it passes; only then `git push origin custom`.
