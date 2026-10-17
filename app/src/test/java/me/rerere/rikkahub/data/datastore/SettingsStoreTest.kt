@@ -190,9 +190,26 @@ class SettingsStoreTest {
         }
 
         val settings = store.settingsFlow.value
-        assertEquals(DEFAULT_PROVIDERS.map { it.id }, settings.providers.map { it.id })
+        // 提供商不再自动补回，删掉的就保持删除状态
+        assertEquals(emptyList<Uuid>(), settings.providers.map { it.id })
         assertEquals(emptyList<Uuid>(), settings.favoriteModels)
         assertEquals(0, settings.searchServiceSelected)
+    }
+
+    @Test
+    fun `fresh install starts from the preset providers`() = runBlocking {
+        // 去掉补回逻辑后，首次启动仍要靠默认值拿到预置列表
+        assertEquals(DEFAULT_PROVIDERS.map { it.id }, reopened().providers.map { it.id })
+    }
+
+    @Test
+    fun `deleted providers stay deleted after reopen`() = runBlocking {
+        val store = open().store
+        store.awaitLoaded()
+        store.update { it.copy(providers = emptyList()) }
+
+        // 空列表必须真的落盘，重新读盘后不能又变回预置列表
+        assertEquals(emptyList<Uuid>(), reopened().providers.map { it.id })
     }
 
     @Test

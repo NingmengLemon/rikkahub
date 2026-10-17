@@ -6,31 +6,33 @@ import me.rerere.ai.provider.ProviderSetting
 internal fun Settings.normalized(): Settings =
     withBuiltInDefaults().withoutInvalidReferences().withValuesInRange()
 
-// 补齐缺失的内置提供商/助手/TTS，内置提供商的描述信息始终以代码里的为准
+// 补齐缺失的内置助手/TTS，内置提供商的描述信息始终以代码里的为准。
+// 提供商不再自动补回：删掉的内置提供商保持删除状态，否则「删除」对预置项无效
 internal fun Settings.withBuiltInDefaults(): Settings {
-    var providers = this.providers.ifEmpty { DEFAULT_PROVIDERS }.toMutableList()
-    DEFAULT_PROVIDERS.forEach { defaultProvider ->
-        if (providers.none { it.id == defaultProvider.id }) {
-            providers.add(defaultProvider.copyProvider())
+    val providers = this.providers
+        // 赞助商预置项已下线，顺带清掉老设置里残留的条目
+        .filterNot { provider -> provider.id in REMOVED_SPONSOR_PROVIDER_IDS }
+        .map { provider ->
+            val defaultProvider = DEFAULT_PROVIDERS.find { it.id == provider.id }
+            if (defaultProvider != null) {
+                provider.copyProvider(
+                    builtIn = defaultProvider.builtIn,
+                    description = defaultProvider.description,
+                    shortDescription = defaultProvider.shortDescription,
+                )
+            } else provider
         }
-    }
-    providers = providers.map { provider ->
-        val defaultProvider = DEFAULT_PROVIDERS.find { it.id == provider.id }
-        if (defaultProvider != null) {
-            provider.copyProvider(
-                builtIn = defaultProvider.builtIn,
-                description = defaultProvider.description,
-                shortDescription = defaultProvider.shortDescription,
-            )
-        } else provider
-    }.toMutableList()
     val assistants = this.assistants.ifEmpty { DEFAULT_ASSISTANTS }.toMutableList()
     DEFAULT_ASSISTANTS.forEach { defaultAssistant ->
         if (assistants.none { it.id == defaultAssistant.id }) {
             assistants.add(defaultAssistant.copy())
         }
     }
-    val ttsProviders = this.ttsProviders.ifEmpty { DEFAULT_TTS_PROVIDERS }.toMutableList()
+    val ttsProviders = this.ttsProviders
+        // 赞助商的 TTS 预置项同样下线
+        .filterNot { provider -> provider.id in REMOVED_SPONSOR_TTS_PROVIDER_IDS }
+        .ifEmpty { DEFAULT_TTS_PROVIDERS }
+        .toMutableList()
     DEFAULT_TTS_PROVIDERS.forEach { defaultTTSProvider ->
         if (ttsProviders.none { provider -> provider.id == defaultTTSProvider.id }) {
             ttsProviders.add(defaultTTSProvider.copyProvider())

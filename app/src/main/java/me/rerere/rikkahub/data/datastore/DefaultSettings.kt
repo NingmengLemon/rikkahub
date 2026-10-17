@@ -41,13 +41,11 @@ internal val DEFAULT_TTS_PROVIDERS = listOf(
         id = DEFAULT_SYSTEM_TTS_ID,
         name = "",
     ),
-    TTSProviderSetting.OpenAI(
-        id = Uuid.parse("e36b22ef-ca82-40ab-9e70-60cad861911c"),
-        name = "AiHubMix",
-        baseUrl = "https://aihubmix.com/v1",
-        model = "gpt-4o-mini-tts",
-        voice = "alloy",
-    )
+)
+
+/** 曾经预置过的赞助商 TTS 提供商，升级后从既有设置中移除。 */
+internal val REMOVED_SPONSOR_TTS_PROVIDER_IDS = setOf(
+    Uuid.parse("e36b22ef-ca82-40ab-9e70-60cad861911c"), // AiHubMix
 )
 
 internal val DEFAULT_ASSISTANTS_IDS = DEFAULT_ASSISTANTS.map { it.id }

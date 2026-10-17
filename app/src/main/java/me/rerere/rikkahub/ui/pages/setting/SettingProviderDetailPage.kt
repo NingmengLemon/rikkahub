@@ -360,14 +360,12 @@ private fun SettingProviderConfigPage(
                         internalProvider = internalProvider,
                     )
 
-                    if (!internalProvider.builtIn) {
-                        IconButton(
-                            onClick = {
-                                showDeleteDialog = true
-                            },
-                        ) {
-                            Icon(HugeIcons.Delete01, stringResource(R.string.delete))
-                        }
+                    IconButton(
+                        onClick = {
+                            showDeleteDialog = true
+                        },
+                    ) {
+                        Icon(HugeIcons.Delete01, stringResource(R.string.delete))
                     }
                 },
             ) {
