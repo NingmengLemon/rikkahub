@@ -36,7 +36,9 @@ Material 3 look (cards with dividers, plain forms).
 - **material3**: Material color utility extensions used by the app UI
 - **ui**: Reusable Compose UI components that do not depend on app logic
 - **search**: Search functionality SDK for multiple providers (Exa, Tavily, Zhipu, Bing, Brave, SearXNG, and others)
-- **speech**: Speech module for TTS and ASR implementations
+- **speech**: Only the serialized `TTSProviderSetting` and `ASRProviderSetting` data classes remain (kept so persisted
+  settings still decode). The TTS and ASR runtime implementations were removed on this branch, see C5 in
+  `docs/custom/README.md`.
 - **web**: Embedded web server module that provides Ktor server startup function and hosts static frontend build files (
   built from web-ui/ React project)
 - **workspace**: Sandboxed per-workspace file system and shell execution environment exposed to the AI as tools.
