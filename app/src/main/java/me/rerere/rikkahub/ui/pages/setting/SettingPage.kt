@@ -64,7 +64,6 @@ import me.rerere.hugeicons.stroke.SmartPhone01
 import me.rerere.hugeicons.stroke.Sun01
 import me.rerere.hugeicons.stroke.Tiktok
 import me.rerere.rikkahub.R
-import me.rerere.rikkahub.utils.plus
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.isNotConfigured
 import me.rerere.rikkahub.data.files.FilesManager
@@ -79,6 +78,7 @@ import me.rerere.rikkahub.ui.theme.ColorMode
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.utils.joinQQGroup
 import me.rerere.rikkahub.utils.openUrl
+import me.rerere.rikkahub.utils.plus
 import me.rerere.rikkahub.utils.writeClipboardText
 import me.rerere.ui.icons.DiscordIcon
 import me.rerere.ui.icons.TencentQQIcon

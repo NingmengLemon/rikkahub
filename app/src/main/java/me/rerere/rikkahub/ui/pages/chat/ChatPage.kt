@@ -472,7 +472,6 @@ private fun ChatPageContent(
         if (showFilesSheet) {
             ChatFilesPickerSheet(
                 inputState = inputState,
-                setting = setting,
                 conversation = conversation,
                 assistant = assistant,
                 chatModel = currentChatModel,
@@ -487,7 +486,6 @@ private fun ChatPageContent(
 @Composable
 private fun ChatFilesPickerSheet(
     inputState: ChatInputState,
-    setting: Settings,
     conversation: Conversation,
     assistant: Assistant,
     chatModel: Model?,
@@ -495,8 +493,6 @@ private fun ChatFilesPickerSheet(
     attachmentPickerActions: ChatAttachmentPickerActions,
     onDismiss: () -> Unit,
 ) {
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
     var showCompressDialog by remember { mutableStateOf(false) }
 
     fun dismissAll() {

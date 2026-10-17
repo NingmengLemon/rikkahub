@@ -2,13 +2,11 @@ package me.rerere.rikkahub.data.ai.tools.local
 
 import android.content.Context
 import me.rerere.ai.core.Tool
-import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.event.AppEventBus
 
 class LocalTools(
     private val context: Context,
     private val eventBus: AppEventBus,
-    private val settingsStore: SettingsStore,
 ) {
     val javascriptTool by lazy { buildJavascriptTool() }
 
