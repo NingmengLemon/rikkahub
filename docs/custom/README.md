@@ -38,6 +38,8 @@ $env:JAVA_HOME='E:\WorkBench\Java\jdk-23.0.2'; $env:PATH="$env:JAVA_HOME\bin;$en
 .\gradlew.bat test --continue --console=plain
 ```
 
+判据是「没有新增失败」，不是「全部通过」。Windows 上有固定的一批失败用例，见后文「测试环境噪声」一节，与代码无关。
+
 ## 定制原则
 
 ### 改动尽量小，优先断入口
@@ -78,9 +80,11 @@ git log --oneline master..custom
 
 ### 避开上游热区
 
-按 `master` 最近 200 个提交统计的文件改动频次（2026-10-17 实测）：
+两个口径都看，用途不同。以下为 2026-10-17 在 `master` 上实测，路径取精确文件路径（用通配符会多计）。
 
-| 文件 | 提交数 |
+全历史改动次数，反映该文件长期被上游改动的密度，也意味着其中积累的结构性变化多：
+
+| 文件 | 全历史 |
 | --- | --- |
 | `ChatVM.kt` | 172 |
 | `RouteActivity.kt` | 115 |
@@ -89,7 +93,18 @@ git log --oneline master..custom
 | `FilesPicker.kt` | 14 |
 | `GenerationLoop.kt` | 7 |
 
-频次越高，定制在下次同步时冲突的可能性越大。C1 与 C2 恰好动了最热的 `ChatVM.kt` 与 `RouteActivity.kt`，因此它们的「合并注意」列写明了具体冲突点，合并时优先看那两行。
+最近 200 个提交内的改动次数，反映当前活跃度：
+
+| 文件 | 近 200 提交 |
+| --- | --- |
+| `ChatService.kt` | 18 |
+| `ChatDrawer.kt` | 9 |
+| `ChatVM.kt` | 7 |
+| `RouteActivity.kt` | 7 |
+| `GenerationLoop.kt` | 7 |
+| `FilesPicker.kt` | 5 |
+
+两个口径会给出不同结论。C1 与 C2 按全历史属于动了最密集的两个文件，按近窗口则是中等热度，而近期最热的 `ChatService.kt` 并未触碰。无论按哪个口径，这三处的具体冲突点都写在清单的「合并注意」列，合并时优先看那里。
 
 上游另有两个长期未合并的重构分支 `refactor/chat-service`（停在 08-26）与 `refactor/ai-stream`（停在 08-12）。它们目前不构成冲突来源，但若上游重启这类重构，上述文件会整体重写，届时应暂停对热区的新定制。
 
@@ -99,7 +114,7 @@ git log --oneline master..custom
 
 | 编号 | 内容 | 落点 | 理由 | 合并注意 |
 | --- | --- | --- | --- | --- |
-| C1 | 移除媒体创作与生图 | `RouteActivity`（路由、`Screen` 定义、intent 处理）、`ChatDrawer`（侧边栏两个入口）、`ViewModelModule`、`RikkaHubApp`（启动恢复）、`SettingPage`（媒体设置入口）、`shortcuts.xml`、`AndroidManifest`；删除 `ui/pages/mediacreation` 与 `ui/pages/imggen` | 不使用 | 数据层刻意保留未动：`MediaCreationEntity`、`MediaCreationDAO`、`MediaCreationRepository`、`MediaCreationService`、`AppModule` 注册、`Settings.mediaGenerationProviders`、`SettingMediaPage`，上游改这些不需处理。两处冲突风险：上游若重排 `RouteActivity` 的 `Screen` 与 entry 列表；以及上游 `feat/mediagen` 分支（16 提交，2026-10-05 仍有活动）正在改 `MediaCreationService.kt` 与被删除的 mediacreation UI，合并时按该分支进度判断是否要恢复部分实现 |
+| C1 | 移除媒体创作与生图 | `RouteActivity`（删 `Screen.ImageGen`、`Screen.MediaCreation`、`Screen.MediaCreationSessions` 及其 entry 与 intent 处理，`Screen.SettingMedia` 的 entry 保留）、`ChatDrawer`（侧边栏两个入口）、`ViewModelModule`、`RikkaHubApp`（启动恢复）、`SettingPage`（媒体设置入口）、`shortcuts.xml`、`AndroidManifest`；删除 `ui/pages/mediacreation` 与 `ui/pages/imggen` | 不使用 | 刻意保留未动：`data/model/MediaCreation.kt`、`data/files/MediaCreationFiles.kt`、`data/db` 下的实体与 DAO、`data/repository/MediaCreationRepository.kt`、`service/MediaCreationService.kt`、`service/MediaCreationForegroundService.kt`、整个 `mediagen/` 模块、manifest 的 `<service>` 声明、`Settings.mediaGenerationProviders`、`SettingMediaPage.kt` 及其路由。合并时不要因为界面上看不到就顺手删掉这些。两处冲突风险：上游若重排 `RouteActivity` 的 `Screen` 与 entry 列表；上游 `feat/mediagen` 分支（16 提交，2026-10-05 仍有活动）正在改 `MediaCreationService.kt` 与被删除的 mediacreation UI，合并时按该分支进度判断是否恢复部分实现 |
 | C2 | 移除 Firebase Analytics | `app/build.gradle.kts`、`AppModule`、`ChatVM`、`ViewModelModule` | 自用不需要埋点上报 | Crashlytics 保留，`google-services` 插件与 `google-services.json` 仍需存在。上游若增删 `ChatVM` 构造参数，`ViewModelModule` 里的显式传参会冲突 |
 
 ## 构建
@@ -107,7 +122,7 @@ git log --oneline master..custom
 本机构建需要以下几个非仓库内的前提，缺任何一项都会在特定任务上失败：
 
 - JDK 必须是 HotSpot。默认 `JAVA_HOME` 指向 OpenJ9 的 JDK 21，KSP 会抛 `NoClassDefFoundError: jdk.jfr.Event`。改用 `E:\WorkBench\Java\jdk-23.0.2`
-- `app/google-services.json` 是占位文件（被 gitignore）。缺失时 `:app:processDebugGoogleServices` 失败。占位配置让 Firebase Analytics 与 Crashlytics 不上报，不影响应用运行
+- `app/google-services.json` 是占位文件（被 gitignore）。缺失时 `:app:processDebugGoogleServices` 失败。占位配置让 Crashlytics 无法上报崩溃，不影响应用运行；Analytics 已在 C2 中移除
 - `local.properties` 提供 release 签名（被 gitignore）
 - `material3/material-color-utilities` 是 submodule，未初始化时 `:material3:compileDebugKotlin` 报 `Unresolved reference 'dynamiccolor'`
 
