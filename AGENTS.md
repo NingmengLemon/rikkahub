@@ -92,3 +92,16 @@ Material 3 look (cards with dividers, plain forms).
 - If the user does not explicitly request localization, prioritize implementing functionality without considering
   localization. (e.g `Text("Hello world")`)
 - For `locale-tui` operations, use the `locale-tui-localization` skill.
+
+## Custom branch
+
+This repository carries personal customizations on top of upstream `rikkahub/rikkahub`.
+
+- Work on `custom`. `master` only follows upstream and must stay fast-forwardable; never commit to it.
+- Read `docs/custom/README.md` before adding or removing a feature. It holds the branch model, the upstream sync
+  procedure, the constraints, and the per-customization checklist.
+- Tag customization commits with the `custom` scope, e.g. `feat(custom): ...`, and append the change to the checklist
+  table in `docs/custom/README.md` so a later upstream merge can be checked against it.
+- Do not change persisted data structures: no Room schema changes, no changes to the meaning of existing DataStore
+  keys, no changes to existing serialized field meanings. New serialized fields must carry a default.
+- Prefer disabling an entry point over deleting an implementation, so upstream merges stay cheap.
