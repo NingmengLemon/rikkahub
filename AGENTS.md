@@ -109,7 +109,9 @@ This repository carries personal customizations on top of upstream `rikkahub/rik
   sample set: no Room schema changes, no changes to the meaning of existing DataStore keys, no changes to existing
   serialized field meanings. New serialized fields must carry a default. Stage 1 of `docs/custom/roadmap.md` defines
   the importer and the validation gate that lift this freeze.
-- Prefer disabling an entry point over deleting an implementation, so upstream merges stay cheap.
+- Prefer disabling an entry point over deleting an implementation, so upstream merges stay cheap. This is a
+  merge-cost concession rather than a permanent rule; the `app/` scope in which it lifts is described in the
+  customization-principles section of `docs/custom/roadmap.md`.
 - Upstream is followed by whole-branch merge today. Following it by module boundary instead is a plan, not the
   current rule: the follow-up strategy section of `docs/custom/roadmap.md` holds the module split and the staged
   approach. Until that plan lands, replay the C3 deletion in `ai/util/Request.kt` on every merge, since it is the
