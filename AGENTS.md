@@ -101,12 +101,19 @@ This repository carries personal customizations on top of upstream `rikkahub/rik
 
 - Work on `custom`. `master` only follows upstream and must stay fast-forwardable; never commit to it.
 - Read `docs/custom/README.md` before adding or removing a feature. It holds the branch model, the upstream sync
-  procedure, the constraints, and the per-customization checklist.
+  procedure, the constraints, and the per-customization checklist. `docs/custom/roadmap.md` holds the long-term plan:
+  the stage split, the easy-migration target, the upstream follow-up strategy, and distribution/compliance notes.
 - Tag customization commits with the `custom` scope, e.g. `feat(custom): ...`, and append the change to the checklist
   table in `docs/custom/README.md` so a later upstream merge can be checked against it.
-- Do not change persisted data structures: no Room schema changes, no changes to the meaning of existing DataStore
-  keys, no changes to existing serialized field meanings. New serialized fields must carry a default.
+- Persisted data structures stay frozen until the official-backup importer exists and passes validation on the fixed
+  sample set: no Room schema changes, no changes to the meaning of existing DataStore keys, no changes to existing
+  serialized field meanings. New serialized fields must carry a default. Stage 1 of `docs/custom/roadmap.md` defines
+  the importer and the validation gate that lift this freeze.
 - Prefer disabling an entry point over deleting an implementation, so upstream merges stay cheap.
+- Upstream is followed by whole-branch merge today. Following it by module boundary instead is a plan, not the
+  current rule: the follow-up strategy section of `docs/custom/roadmap.md` holds the module split and the staged
+  approach. Until that plan lands, replay the C3 deletion in `ai/util/Request.kt` on every merge, since it is the
+  only customization under `ai/`.
 - Before pushing a batch of customizations, run an independent review: dispatch a fresh-context `subagent` (not
   `subagent_fork`) and have it load the `code-review` skill, reviewing `master..custom`. Fix what it finds and re-run
   until it passes; only then `git push origin custom`.
