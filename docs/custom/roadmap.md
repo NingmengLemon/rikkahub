@@ -106,7 +106,7 @@ upload/ skills/ fonts/ media_creation/    附件，可选择不备份
 
 ### 2.1 改包名
 
-当前是 `me.rerere.rikkahub`，debug 变体带 `.debug` 后缀。
+已完成：`applicationId` 是 `top.lemoneko.rakkihub`，debug 变体带 `.debug` 后缀；`namespace` 仍是 `me.rerere.rikkahub`，类名与 R 类不受影响。
 
 不受影响的部分：`FileProvider`、`DocumentsProvider`、`androidx-startup` 的 authorities 都是 `${applicationId}` 拼的，自动跟随。数据库文件名 `rikka_hub` 与 DataStore 文件名是不带包名的固定字符串，`rikka_hub.db` 是备份归档里的条目名，不是设备上的文件名。
 
@@ -114,7 +114,7 @@ upload/ skills/ fonts/ media_creation/    附件，可选择不备份
 
 - 私有目录跟着包名走，改包名等于全新安装、零数据。因此阶段 1 必须先完成并验证通过，顺序不能反，反了就是把现有数据置于风险中
 - 改包名后新旧两个应用并存，迁移路径只能是「旧应用导出、新应用导入」。旧应用可能是官方版，也可能是本 fork 的旧构建，两条来源都要能吃下，见要求 3
-- `AndroidManifest.xml` 里的 `rikkahub://shortcut` scheme 是硬编码的，不跟包名走。两个应用都注册同一 scheme 时点快捷方式可能开错应用，需要换名
+- `AndroidManifest.xml` 里的 `rikkahub://shortcut` scheme 是硬编码的，不跟包名走。两个应用都注册同一 scheme 时，外部隐式 intent 会落到不确定的那个。已改为 `rakkihub://shortcut`，`res/xml/shortcuts.xml` 里的 `android:data` 同步改掉
 
 ### 2.2 自己的 CI
 

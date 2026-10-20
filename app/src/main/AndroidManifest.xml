@@ -107,7 +107,7 @@
 
         <data
           android:host="shortcut"
-          android:scheme="rikkahub" />
+          android:scheme="rakkihub" />
       </intent-filter>
     </activity>
     <activity

@@ -153,6 +153,7 @@ C6 标为计划中。3.0.0 那批重构已经合并进来，但 C6 的落点（`
 | C9 | 移除 S3 备份 | `data/sync/S3Sync.kt` 与 `ui/pages/backup/tabs/S3Tab.kt` 整个删除；`DataSourceModule` 的 `S3Sync` 绑定；`BackupVM`（`s3Sync` 参数、`s3BackupItems`、`loadS3BackupFileItems`、`testS3`、`backupToS3`、`restoreFromS3`、`deleteS3BackupFile`，以及 `S3BackupItem` 的 import）；`BackupPage`（S3 分页与 `HugeIcons.Bucket` import）；`backup_page_s3_backup` 与 `backup_page_s3_backup_files` 两条文案已删除；`setting_media_page_s3_desc` 里「与备份用的 S3 相互独立」半句在 7 个 locale 一并去掉 | 不用 S3 做备份，WebDAV 与本地文件已够用 | **S3 底层必须保留**：`data/sync/s3/S3Client.kt`、`AwsSignatureV4.kt`、`S3Config.kt`、`ui/components/ui/S3ConfigItems.kt` 仍被媒体创作的素材上传使用（`RemoteFileStore` + `Settings.uploadS3Config` + `SettingMediaPage`），`backup_page_s3_endpoint` 等 7 条连接配置文案也仍在使用。`Settings.s3Config` 是已存储字段，未删除以免改动结构，只是不再有读写方。合并注意：上游若改 `S3Config` 或 `S3ConfigItems`，要确认媒体页那条路径仍然可用 |
 | C10 | 新增从官方 RikkaHub 导入 | `ImportExportTab`（新增「从官方 RikkaHub 导入」分组与 `ImportSource.OFFICIAL`，与本地导入共用同一个确认对话框与 `openDocumentLauncher`）；7 个 locale 新增 `backup_page_import_from_official` 与 `backup_page_import_official_desc` | 改包名后本应用与官方应用并存，需要一个明确的迁移入口 | 官方备份与本应用的归档格式相同（`settings.json` + `rikka_hub.db` + 附件目录），所以复用同一条 `stageRestore` 流程，入口只负责引导用户先在官方应用里导出备份。`JsonInstant` 开了 `ignoreUnknownKeys`，官方备份里的额外字段不会导致解码失败 |
 | C11 | 导出备份显示进度 | `BackupManager.createBackup`（新增可选 `onProgress` 回调与 `BackupProgress`，附件先收集成列表再写入）；`WebDavSync.prepareBackupFile`（透传回调）；`BackupVM`（`exportProgress` 状态与 `finally` 清理）；`ImportExportTab`（打包阶段显示确定进度，写入目标文件阶段显示不确定进度）；7 个 locale 新增 `backup_page_export_packing` 与 `backup_page_saving` | 附件多时导出要等很久，没有进度不知道卡在哪一步 | 打包阶段按条目推进：`settings.json`、数据库快照、每个附件各算一条，`total` 与 `advance()` 的调用点一一对应。改为先收集附件再写入是为了给出确定的总数，代价是「列出」与「写入」之间文件消失的窗口从一个文件扩大到整个打包阶段；`PARTIAL_SUFFIX` 过滤与 `resolveInside` 校验都保留 |
+| C12 | 改包名与应用名 | `app/build.gradle.kts`（`applicationId` 改为 `top.lemoneko.rakkihub`）、`AndroidManifest.xml`（shortcut deep link 的 scheme 从 `rikkahub` 改为 `rakkihub`）、`res/xml/shortcuts.xml`（`android:data` 同步）、七处 `app_name` 改为 `RakkiHub`、`ExampleInstrumentedTest`（不再写死旧包名，改与 `BuildConfig.APPLICATION_ID` 比对） | 自主 fork 阶段要与官方应用并存，安装标识与私有数据目录必须独立 | `namespace` 保持 `me.rerere.rikkahub` 不动，类名、R 类与 `shortcuts.xml` 的 `targetClass` 都不受影响；`applicationIdSuffix = ".debug"` 保留，debug 包名是 `top.lemoneko.rakkihub.debug`；`${applicationId}` 拼的 authorities 与 `BuildConfig.APPLICATION_ID` 自动跟随。`google-services.json` 的两个 package_name 与 CI 的 `GOOGLE_SERVICES_JSON` secret 必须同步，否则 `processGoogleServices` 会失败 |
 
 ## 构建
 
@@ -168,7 +169,7 @@ $env:JAVA_HOME='E:\WorkBench\Java\jdk-23.0.2'; $env:PATH="$env:JAVA_HOME\bin;$en
 .\gradlew.bat :app:assembleDebug :app:assembleRelease
 ```
 
-产物位于 `app/build/outputs/apk/debug/` 与 `app/build/outputs/apk/release/`，各有 universal 与分 ABI 三种。debug 的 applicationId 带 `.debug` 后缀，可与官方版共存；release 使用自签名，与官方签名冲突，需先卸载官方版。
+产物位于 `app/build/outputs/apk/debug/` 与 `app/build/outputs/apk/release/`，各有 universal 与分 ABI 三种。debug 的 applicationId 是 `top.lemoneko.rakkihub.debug`，与官方版是完全不同的包名，可与之共存；release 使用自签名，与官方签名冲突，需先卸载官方版。
 
 ## 测试环境噪声
 

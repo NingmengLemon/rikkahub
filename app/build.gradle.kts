@@ -23,7 +23,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "me.rerere.rikkahub"
+        applicationId = "top.lemoneko.rakkihub"
         minSdk = 26
         targetSdk = 37
         versionCode = 193
