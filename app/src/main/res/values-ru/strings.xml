@@ -714,7 +714,6 @@
   <string name="setting_page_mcp_desc">Настроить серверы MCP</string>
   <string name="setting_page_message_display_settings">Отображение сообщений</string>
   <string name="setting_page_model_and_services">Модели и службы</string>
-  <string name="setting_page_no_share_app">Приложение для обмена не найдено</string>
   <string name="setting_page_providers">Провайдеры</string>
   <string name="setting_page_providers_desc">Настроить поставщиков ИИ</string>
   <string name="setting_page_request_logs">Журналы запросов</string>
@@ -730,9 +729,6 @@
   <string name="setting_page_search_test_query_hint">Введите тестовый запрос…</string>
   <string name="setting_page_search_test_run">Запустить тест</string>
   <string name="setting_page_search_title">Служба поиска</string>
-  <string name="setting_page_share">Поделиться</string>
-  <string name="setting_page_share_desc">Поделиться этим приложением с друзьями</string>
-  <string name="setting_page_share_text">RikkaHub — открытый Android-ассистент с ИИ\n\nСайт: https://rikka-ai.com/</string>
   <string name="setting_page_theme_setting">Тема</string>
   <string name="setting_page_theme_setting_desc">Настроить цветовую схему приложения</string>
   <string name="setting_theme_page_preset_themes">Предустановленные темы</string>
@@ -753,7 +749,7 @@
   <string name="setting_page_web_server_address_note_desc">LAN-адрес: использует IP-адрес устройства в Wi-Fi, доступен другим устройствам в той же сети. Недоступен при использовании мобильных данных.
 Локальный адрес: использует localhost, доступен только на этом устройстве.
 Адрес mDNS: использует имя хоста .local, доступен по имени с других устройств в той же сети без знания IP-адреса.</string>
-  <string name="setting_page_web_server_desc">Разрешить доступ к RikkaHub через веб</string>
+  <string name="setting_page_web_server_desc">Разрешить доступ к RakkiHub через веб</string>
   <string name="setting_page_web_server_error">Ошибка</string>
   <string name="setting_page_web_server_jwt_enable">Включить аутентификацию</string>
   <string name="setting_page_web_server_jwt_enable_desc">Требовать проверку пароля при доступе к веб-интерфейсу</string>

@@ -122,9 +122,7 @@ upload/ skills/ fonts/ media_creation/    附件，可选择不备份
 
 上游 `.github/workflows/daily-build.yml` 需要的前提：JDK 21（jetbrains distribution）、pnpm 11、Node 22、`submodules: recursive`、`web-ui` 先跑 `pnpm install --frozen-lockfile`。
 
-三个 secrets 缺一不可：`KEY_BASE64`（keystore）、`SIGNING_CONFIG`（写进 `local.properties`）、`GOOGLE_SERVICES_JSON`。
-
-`GOOGLE_SERVICES_JSON` 不能省。C2 只移除了 Firebase Analytics，Crashlytics 与 `google-services` 插件仍在，缺这个文件 `processReleaseGoogleServices` 会失败。
+两个 secrets 缺一不可：`KEY_BASE64`（keystore）与 `SIGNING_CONFIG`（写进 `local.properties`）。C13 移除 Firebase 与 `google-services` 插件之后，`GOOGLE_SERVICES_JSON` 已不再需要。
 
 与本仓库的差异：不需要每晚发布 prerelease，不做发版，产物存为 workflow artifact 即可。
 

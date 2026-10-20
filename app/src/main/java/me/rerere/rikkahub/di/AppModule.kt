@@ -1,7 +1,5 @@
 package me.rerere.rikkahub.di
 
-import com.google.firebase.Firebase
-import com.google.firebase.crashlytics.crashlytics
 import kotlinx.serialization.json.Json
 import me.rerere.rikkahub.AppScope
 import me.rerere.rikkahub.data.ai.ChatRequestFactory
@@ -44,10 +42,6 @@ val appModule = module {
 
     single<EmojiData> {
         EmojiUtils.loadEmoji(get())
-    }
-
-    single {
-        Firebase.crashlytics
     }
 
     single {

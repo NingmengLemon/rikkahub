@@ -1,7 +1,5 @@
 package me.rerere.rikkahub.ui.pages.setting
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -59,7 +57,6 @@ import me.rerere.hugeicons.stroke.Moon02
 import me.rerere.hugeicons.stroke.Package
 import me.rerere.hugeicons.stroke.ServerStack01
 import me.rerere.hugeicons.stroke.Settings03
-import me.rerere.hugeicons.stroke.Share04
 import me.rerere.hugeicons.stroke.SmartPhone01
 import me.rerere.hugeicons.stroke.Sun01
 import me.rerere.hugeicons.stroke.Tiktok
@@ -257,9 +254,6 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
 
             item("aboutSettings") {
                 val context = LocalContext.current
-                val shareText = stringResource(R.string.setting_page_share_text)
-                val share = stringResource(R.string.setting_page_share)
-                val noShareApp = stringResource(R.string.setting_page_no_share_app)
                 val containerColor = MaterialTheme.colorScheme.primaryContainer
                 val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 CardGroup(
@@ -328,21 +322,6 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         leadingContent = { CardGroupIcon(HugeIcons.InLove, containerColor = containerColor, contentColor = contentColor) },
                         supportingContent = { Text(stringResource(R.string.setting_page_donate_desc)) },
                         headlineContent = { Text(stringResource(R.string.setting_page_donate)) },
-                    )
-                    item(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_SEND)
-                            intent.type = "text/plain"
-                            intent.putExtra(Intent.EXTRA_TEXT, shareText)
-                            try {
-                                context.startActivity(Intent.createChooser(intent, share))
-                            } catch (e: ActivityNotFoundException) {
-                                Toast.makeText(context, noShareApp, Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        leadingContent = { CardGroupIcon(HugeIcons.Share04, containerColor = containerColor, contentColor = contentColor) },
-                        supportingContent = { Text(stringResource(R.string.setting_page_share_desc)) },
-                        headlineContent = { Text(stringResource(R.string.setting_page_share)) },
                     )
                 }
             }
