@@ -10,7 +10,7 @@
 | --- | --- |
 | `README.md` | 分支模型、同步流程、定制原则、定制清单、构建与测试环境 |
 | `roadmap.md` | 长期路线：阶段划分、易迁移目标、追更策略、分发与合规 |
-| `upstream/` | 单次上游同步的作业单，合并落地后删除 |
+| `upstream/` | 单次上游同步的作业单，合并落地后删除；当前没有待办的作业单 |
 
 ## 分支模型
 
@@ -28,7 +28,7 @@
 
 远端默认分支是 `custom`。本地 `origin/HEAD` 的缓存仍指向 `origin/master`，可用 `git remote set-head origin -a` 刷新。
 
-上游 master 已引入 Spotless + ktlint（`76e25d95`，在 3.0.0 发布之后），其 `ratchetFrom("origin/master")` 写死了 `origin/master`。下一次合并把这一版带进来之后，`master` 必须保持跟随上游并存在于 `origin`，不要清理这个引用，否则格式化闸门会静默失效。
+上游已引入 Spotless + ktlint（`76e25d95`，在 3.0.0 发布之后），其 `ratchetFrom("origin/master")` 写死了 `origin/master`，只检查相对该引用改动过的文件。因此 `master` 必须保持跟随上游并存在于 `origin`，不要清理这个引用：本地 `master` 已快进到 `e5bb7073` 但尚未推送到 `origin` 时，`origin/master` 仍停在合并前的基点，`spotlessCheck` 会把上游那一整批文件当作改动过的来检查，报出与本地定制无关的格式违规。
 
 ## 上游同步流程
 
@@ -56,7 +56,7 @@ $env:JAVA_HOME='E:\WorkBench\Java\jdk-23.0.2'; $env:PATH="$env:JAVA_HOME\bin;$en
 
 ### 当前待处理的同步
 
-上游 3.0.0 的同步尚未进行，冲突面与建议的合并顺序已实测记录在 [`upstream/3.0.0.md`](upstream/3.0.0.md)。
+无。基点已随 3.1.0 的合并前移到 `e5bb7073`，下一次同步从该点开始。
 
 ## 定制原则
 
@@ -104,31 +104,31 @@ git log --oneline master..custom
 
 ### 避开上游热区
 
-两个口径都看，用途不同。以下为 2026-10-17 在 `master` 上实测，路径取精确文件路径（用通配符会多计）。
+两个口径都看，用途不同。以下为 2026-10-20 在 `master`（上游 3.1.0 合并后）上实测，路径取精确文件路径（用通配符会多计）。
 
 全历史改动次数，反映该文件长期被上游改动的密度，也意味着其中积累的结构性变化多：
 
 | 文件 | 全历史 |
 | --- | --- |
-| `ChatVM.kt` | 172 |
-| `RouteActivity.kt` | 115 |
-| `ChatService.kt` | 109 |
-| `ChatDrawer.kt` | 37 |
-| `FilesPicker.kt` | 14 |
-| `GenerationLoop.kt` | 7 |
+| `ChatVM.kt` | 175 |
+| `RouteActivity.kt` | 116 |
+| `ChatService.kt` | 114 |
+| `ChatDrawer.kt` | 38 |
+| `FilesPicker.kt` | 16 |
 
 最近 200 个提交内的改动次数，反映当前活跃度：
 
 | 文件 | 近 200 提交 |
 | --- | --- |
-| `ChatService.kt` | 18 |
-| `ChatDrawer.kt` | 9 |
-| `ChatVM.kt` | 7 |
-| `RouteActivity.kt` | 7 |
-| `GenerationLoop.kt` | 7 |
-| `FilesPicker.kt` | 5 |
+| `ChatService.kt` | 19 |
+| `ChatDrawer.kt` | 10 |
+| `ChatVM.kt` | 8 |
+| `RouteActivity.kt` | 8 |
+| `FilesPicker.kt` | 6 |
 
 两个口径会给出不同结论。C1 与 C2 按全历史属于动了最密集的两个文件，按近窗口则是中等热度。`60d016bb` 那次清理改到了 `ChatService.kt`，它是近期最热的文件之一，语音相关的清理集中在它身上，合并时按清单的「合并注意」列逐项复核。
+
+`GenerationLoop.kt` 已随上游 3.0.0 的重构删除，多步生成循环迁到 `ai/src/main/java/me/rerere/ai/agent/AgentLoop.kt`。后者在本次合并后才出现，改动 3 次，还没积累出热度。
 
 上游另有两个长期未合并的重构分支 `refactor/chat-service`（停在 08-26）与 `refactor/ai-stream`（停在 08-12）。它们目前不构成冲突来源，但若上游重启这类重构，上述文件会整体重写，届时应暂停对热区的新定制。
 
@@ -136,17 +136,17 @@ git log --oneline master..custom
 
 每次新增定制都往表里加一行。合并冲突时按表逐项复核，确保定制意图没有在合并中被静默丢掉。
 
-C6 与 C7 标为计划中。上游 3.0.0 的重构面尚未稳定，此时动这两处会在下次同步时与上游改动正面相撞，等上游版本节奏放缓后再实施。
+C6 与 C7 标为计划中。3.0.0 那批重构已经合并进来，这两处仍未实施；它们的落点（`ChatService` 里的建议请求、`SettingModelPage` 与 `SettingModelPromptPage`、`mipmap-*` 下的图标）都还是上游活跃改动区域，等这几轮迭代平稳之后再动，避免刚做完又要重放。
 
 | 编号 | 内容 | 落点 | 理由 | 合并注意 |
 | --- | --- | --- | --- | --- |
-| C1 | 移除媒体创作与生图 | `RouteActivity`（删 `Screen.ImageGen`、`Screen.MediaCreation`、`Screen.MediaCreationSessions` 及其 entry 与 intent 处理，`Screen.SettingMedia` 的 entry 保留）、`ChatDrawer`（侧边栏两个入口）、`ViewModelModule`、`RikkaHubApp`（启动恢复）、`SettingPage`（媒体设置入口）、`shortcuts.xml`、`AndroidManifest`；删除 `ui/pages/mediacreation` 与 `ui/pages/imggen`；其遗留的 158 条字符串文案（`media_creation_*`、`imggen_page_*`、`chat_page_menu_image_generation`、`shortcut_media_creation`、`setting_page_media_desc`、`menu`、`sketch_draw_on_image`）已删除 | 不使用 | 刻意保留未动：`data/model/MediaCreation.kt`、`data/files/MediaCreationFiles.kt`、`data/db` 下的实体与 DAO、`data/repository/MediaCreationRepository.kt`、`service/MediaCreationService.kt`、`service/MediaCreationForegroundService.kt`、整个 `mediagen/` 模块、manifest 的 `<service>` 声明、`Settings.mediaGenerationProviders`、`SettingMediaPage.kt` 及其路由。合并时不要因为界面上看不到就顺手删掉这些。两处冲突风险：上游若重排 `RouteActivity` 的 `Screen` 与 entry 列表；上游 `feat/mediagen` 分支（16 提交，2026-10-05 仍有活动）正在改 `MediaCreationService.kt` 与被删除的 mediacreation UI，合并时按该分支进度判断是否恢复部分实现 |
+| C1 | 移除媒体创作与生图 | `RouteActivity`（删 `Screen.ImageGen`、`Screen.MediaCreation`、`Screen.MediaCreationSessions` 及其 entry 与 intent 处理，`Screen.SettingMedia` 的 entry 保留）、`ChatDrawer`（侧边栏两个入口）、`ViewModelModule`、`RikkaHubApp`（启动恢复）、`SettingPage`（媒体设置入口）、`shortcuts.xml`、`AndroidManifest`；删除 `ui/pages/mediacreation` 与 `ui/pages/imggen`；其遗留的 157 条字符串文案（`media_creation_*`、`imggen_page_*`、`chat_page_menu_image_generation`、`shortcut_media_creation`、`setting_page_media_desc`、`menu`）已删除；`sketch_draw_on_image` 当时一并删除，但它同时是聊天输入框画板的按钮文案，已恢复 | 不使用 | 刻意保留未动：`data/model/MediaCreation.kt`、`data/files/MediaCreationFiles.kt`、`data/db` 下的实体与 DAO、`data/repository/MediaCreationRepository.kt`、`service/MediaCreationService.kt`、`service/MediaCreationForegroundService.kt`、整个 `mediagen/` 模块、manifest 的 `<service>` 声明、`Settings.mediaGenerationProviders`、`SettingMediaPage.kt` 及其路由。合并时不要因为界面上看不到就顺手删掉这些。两处冲突风险：上游若重排 `RouteActivity` 的 `Screen` 与 entry 列表；上游 `feat/mediagen` 分支（16 提交，2026-10-05 仍有活动）正在改 `MediaCreationService.kt` 与被删除的 mediacreation UI，合并时按该分支进度判断是否恢复部分实现 |
 | C2 | 移除 Firebase Analytics | `app/build.gradle.kts`、`AppModule`、`ChatVM`、`ViewModelModule` | 自用不需要埋点上报 | Crashlytics 保留，`google-services` 插件与 `google-services.json` 仍需存在。上游若增删 `ChatVM` 构造参数，`ViewModelModule` 里的显式传参会冲突 |
 | C3 | 移除赞助商推广，并允许删除所有提供商 | `DefaultProviders.kt`（删掉 AiHubMix、APIMart、随想AI网关、MaruCode 四项，新增 `REMOVED_SPONSOR_PROVIDER_IDS`）、`RecommendedProviders.kt`（整个文件删除，它只包含这四家）、`SettingProviderPage.kt`（断开右上角推荐 Sheet、去掉 AiHubMix 的「10% 优惠」标签、去掉列表删除菜单的 `builtIn` 门禁）、`SettingProviderDetailPage.kt`（去掉详情页删除按钮的 `builtIn` 门禁）、`ai/util/Request.kt`（去掉 `configureReferHeaders` 里给 aihubmix.com 加 `APP-Code` 的分支）、`DefaultSettings.kt`（去掉 AiHubMix 的 TTS 预置项，新增 `REMOVED_SPONSOR_TTS_PROVIDER_IDS`）、`SettingsNormalization.kt`（提供商不再补回；助手与 TTS 仍补回）、相关测试 | 不用这些推广渠道；预置项原本在界面上无法删除，规范化又会把删掉的补回来 | 行为改动，`Settings.providers` 字段与 DataStore key 未变，不触发迁移。三点副作用：其一，存量里的赞助商条目会在下一次设置变更写盘时从设置中清掉，用户在这四家填过的 API key 与自建模型随之消失，回退旧版本后不会再出现；其二，因为不再补回，上游以后新增的预置提供商不会出现在已有安装里，需要手动添加；其三，删掉提供商后 `chatModelId` 等可能悬空，查找返回 null 并按未选择处理。上游若重写 `withBuiltInDefaults`，必须确认仍不补回提供商，否则删除功能失效；上游若恢复 `RecommendedProviders.kt` 或推荐入口，需要重新删除。`setting_provider_page_recommend` 字符串已删除 |
 | C4 | 清理赞助商图标、README 推广与启动赞助弹窗 | `utils/AIIconMatcher.kt`（删掉 aihubmix 的图标映射与匹配正则）、`app/src/main/assets/icons/aihubmix-color.svg`（删除）、`README.md`、`README_ZH_CN.md`、`README_ZH_TW.md`（删掉 Sponsors 章节）、`SettingPage.kt`（删掉启动 100 次后的赞助弹窗及其失效的三个 import 与 `launchCount` 订阅）、`SettingVM.kt`（删掉失去唯一读者的 `launchCount`）、弹窗的 4 条 `setting_page_sponsor_alert_*` 字符串 × 7 个 locale 已删除 | 不需要推广入口 | 捐赠页 `SettingDonatePage`、`SponsorAPI`、`Screen.SettingDonate` 与捐赠相关字符串保留不动。`Settings.sponsorAlertDismissedAt` 是已存储字段，未删除以免改动结构，只是不再有自动写入方，`DebugPage` 仍可手动改。刻意保留：`docs/sponsors/*.png` 已无引用但仍留在仓库里，删除会与上游图片更新产生 modify/delete 冲突。合并注意：三份 README 属上游高频改动文档，以上游最新版为准并重新删掉 Sponsors 章节；`SettingPage` 的弹窗区域与 `SettingProviderPage` 类似，上游若加回推广块，需要重新删除 |
-| C5 | 移除 TTS 与 STT（语音合成与语音识别） | **speech 模块删除 32 个文件**（`speech/src/main/java/me/rerere/` 下除 `tts/provider/TTSProviderSetting.kt`、`asr/ASRProviderSetting.kt` 外的全部）：ASR 侧 `ASRController.kt`、`ASRState.kt`、`ASRVoiceTurn.kt`、`AudioAmplitude.kt`、`providers/DashScopeASRController.kt`、`providers/MiMoASRController.kt`、`providers/OpenAIRealtimeASRController.kt`、`providers/StepASRController.kt`、`providers/VolcengineASRController.kt`、`providers/VolcengineASRProtocol.kt`；TTS 侧 `controller/AudioPlayer.kt`、`controller/TextChunker.kt`、`controller/TtsController.kt`、`controller/TtsSynthesizer.kt`、`model/PlaybackState.kt`、`model/TTSRequest.kt`、`model/TTSResponse.kt`、`provider/TTSManager.kt`、`provider/TTSProvider.kt`、`provider/TTSProviderException.kt`、`provider/providers/` 下 `ElevenLabsTTSProvider.kt`、`FishAudioTTSProvider.kt`、`GeminiTTSProvider.kt`、`GroqTTSProvider.kt`、`MiMoTTSProvider.kt`、`MiniMaxTTSProvider.kt`、`OpenAITTSProvider.kt`、`QwenTTSProvider.kt`、`StepTTSProvider.kt`、`SystemTTSProvider.kt`、`VolcengineTTSProvider.kt`、`XAITTSProvider.kt`；**测试删除 5 个**：`app/src/test/java/me/rerere/rikkahub/ui/pages/chat/VoiceSessionControllerTest.kt`、`speech/src/test/java/me/rerere/asr/ASRVoiceTurnTest.kt`、`speech/src/test/java/me/rerere/asr/providers/VolcengineASRProtocolTest.kt`、`speech/src/test/java/me/rerere/tts/provider/providers/MiMoTTSProviderTest.kt`、`speech/src/test/java/me/rerere/tts/provider/providers/VolcengineTTSProviderTest.kt`；**app 侧删除**：`ui/hooks/TTS.kt`、`ui/hooks/ASR.kt`、`ui/context/LocalTTSState.kt`、`ui/context/LocalASRState.kt`、`ui/components/ui/TTSController.kt`、`ui/components/ai/AsrButton.kt`、`ui/components/ai/VoiceModeRow.kt`、`ui/pages/chat/VoiceSessionController.kt`、`ui/pages/chat/VoiceMode.kt`、`ui/pages/chat/TTSAutoPlay.kt`、`ui/pages/setting/SettingSpeechPage.kt`、`ui/pages/setting/components/TTSProviderConfigure.kt`、`ui/pages/setting/components/ASRProviderConfigure.kt`、`data/ai/tools/local/TextToSpeechTool.kt`；**断入口**：`SettingPage` 语音项、`SettingPreferencesGeneralPage` 的「TTS 设置」区块、`ChatInput` 麦克风与录音权限音效、`FilesPicker` 语音模式项、`ChatMessageActions` 朗读、`AssistantLocalToolPage` 的 TTS 开关、`RouteActivity` 的 TTS/ASR 状态与 `Screen.SettingSpeech`、`BuiltinToolUIs` 的 TTS 渲染与 `ToolUIRegistry` 注册、`LocalTools` 不再产出 TTS 工具、构造参数去掉 `ttsManager` 与 `settingsStore`、`AppModule` 解绑 `TTSManager` 并调整 `LocalTools` 注入、`ChatPage` 与 `ChatVM` 的语音会话接线、manifest 的 `RECORD_AUDIO` 与 `TTS_SERVICE` 查询；**一并清掉的死代码与孤儿资源**：`AppEvent.Speak`、`ChatService.enqueueVoiceMessage`、`SettingsExt` 的 `getSelectedTTSProvider` 与 `getSelectedASRProvider`、`PermissionTypes.PermissionRecordAudio`、`MessageQueue` 的 reply 等待通道与 `MessageQueuePausedException`、`ChatService` 里对应的 reply 完成路径与 `failReplyWaiters` 调用、3 个 voice 队列测试、`res/raw/asr_start.mp3` 与 `asr_stop.mp3`，以及 7 个 locale 各 314 条无引用字符串（按归属拆开：媒体创作与生图 158 条属 C1、提供商推荐 1 条属 C3、赞助弹窗 4 条属 C4、语音相关 151 条属 C5） | 不用语音功能 | 保留存储与反序列化：`Settings.ttsProviders`、`asrProviders`、`selectedTTSProviderId`、`selectedASRProviderId`、`defaultTTSPlaybackSpeed`、`ttsOnlyReadQuoted`、`ttsOnlyReadOutsideBrackets`、`autoPlayTTSAfterGeneration` 等字段与 DataStore key 未动；`TTSProviderSetting`、`ASRProviderSetting` 逐字节未改；`DEFAULT_TTS_PROVIDERS`（只剩 SystemTTS）与 TTS 补回逻辑保留；`LocalToolOption.Tts` 枚举值保留，旧助手配置仍可反序列化；`speech` 的 `build.gradle.kts` 未精简，仍带 media3 等用不到的依赖。与 C4 不同，这里选择的是彻底清理而非保留孤儿，理由是语音功能的入口、实现、文案与音效已全部消失，留着孤儿只会增加维护时的误判。合并注意：app 侧语音代码是上游活跃区域（3.0.0 就加了语音模式开关），恢复实现时需补齐上述入口；`speech` 模块上游虽未改动，但按本行删空后不要因界面上看不到而恢复。`SettingPage`、`SettingPreferencesGeneralPage`、`ChatInput`、`ChatMessageActions`、`ChatPage`、`ChatVM`、`ChatService`、`RouteActivity` 均为热区，冲突时以保留删除为准 |
+| C5 | 移除 TTS 与 STT（语音合成与语音识别） | **speech 模块删除 32 个文件**（`speech/src/main/java/me/rerere/` 下除 `tts/provider/TTSProviderSetting.kt`、`asr/ASRProviderSetting.kt` 外的全部）：ASR 侧 `ASRController.kt`、`ASRState.kt`、`ASRVoiceTurn.kt`、`AudioAmplitude.kt`、`providers/DashScopeASRController.kt`、`providers/MiMoASRController.kt`、`providers/OpenAIRealtimeASRController.kt`、`providers/StepASRController.kt`、`providers/VolcengineASRController.kt`、`providers/VolcengineASRProtocol.kt`；TTS 侧 `controller/AudioPlayer.kt`、`controller/TextChunker.kt`、`controller/TtsController.kt`、`controller/TtsSynthesizer.kt`、`model/PlaybackState.kt`、`model/TTSRequest.kt`、`model/TTSResponse.kt`、`provider/TTSManager.kt`、`provider/TTSProvider.kt`、`provider/TTSProviderException.kt`、`provider/providers/` 下 `ElevenLabsTTSProvider.kt`、`FishAudioTTSProvider.kt`、`GeminiTTSProvider.kt`、`GroqTTSProvider.kt`、`MiMoTTSProvider.kt`、`MiniMaxTTSProvider.kt`、`OpenAITTSProvider.kt`、`QwenTTSProvider.kt`、`StepTTSProvider.kt`、`SystemTTSProvider.kt`、`VolcengineTTSProvider.kt`、`XAITTSProvider.kt`；**测试删除 5 个**：`app/src/test/java/me/rerere/rikkahub/ui/pages/chat/VoiceSessionControllerTest.kt`、`speech/src/test/java/me/rerere/asr/ASRVoiceTurnTest.kt`、`speech/src/test/java/me/rerere/asr/providers/VolcengineASRProtocolTest.kt`、`speech/src/test/java/me/rerere/tts/provider/providers/MiMoTTSProviderTest.kt`、`speech/src/test/java/me/rerere/tts/provider/providers/VolcengineTTSProviderTest.kt`；**app 侧删除**：`ui/hooks/TTS.kt`、`ui/hooks/ASR.kt`、`ui/context/LocalTTSState.kt`、`ui/context/LocalASRState.kt`、`ui/components/ui/TTSController.kt`、`ui/components/ai/AsrButton.kt`、`ui/components/ai/VoiceModeRow.kt`、`ui/pages/chat/VoiceSessionController.kt`、`ui/pages/chat/VoiceMode.kt`、`ui/pages/chat/TTSAutoPlay.kt`、`ui/pages/setting/SettingSpeechPage.kt`、`ui/pages/setting/components/TTSProviderConfigure.kt`、`ui/pages/setting/components/ASRProviderConfigure.kt`、`data/ai/tools/local/TextToSpeechTool.kt`；**断入口**：`SettingPage` 语音项、`SettingPreferencesGeneralPage` 的「TTS 设置」区块、`ChatInput` 麦克风与录音权限音效、`FilesPicker` 语音模式项、`ChatMessageActions` 朗读、`AssistantLocalToolPage` 的 TTS 开关、`RouteActivity` 的 TTS/ASR 状态与 `Screen.SettingSpeech`、`BuiltinToolUIs` 的 TTS 渲染与 `ToolUIRegistry` 注册、`LocalTools` 不再产出 TTS 工具、构造参数去掉 `ttsManager` 与 `settingsStore`、`AppModule` 解绑 `TTSManager` 并调整 `LocalTools` 注入、`ChatPage` 与 `ChatVM` 的语音会话接线、manifest 的 `RECORD_AUDIO` 与 `TTS_SERVICE` 查询；**一并清掉的死代码与孤儿资源**：`AppEvent.Speak`、`ChatService.enqueueVoiceMessage`、`SettingsExt` 的 `getSelectedTTSProvider` 与 `getSelectedASRProvider`、`PermissionTypes.PermissionRecordAudio`、`MessageQueue` 的 reply 等待通道与 `MessageQueuePausedException`、`ChatService` 里对应的 reply 完成路径与 `failReplyWaiters` 调用、3 个 voice 队列测试、`res/raw/asr_start.mp3` 与 `asr_stop.mp3`，以及 7 个 locale 各 316 条无引用字符串（按归属拆开：媒体创作与生图 157 条属 C1、提供商推荐 1 条属 C3、赞助弹窗 4 条属 C4、语音相关 154 条属 C5） | 不用语音功能 | 保留存储与反序列化：`Settings.ttsProviders`、`asrProviders`、`selectedTTSProviderId`、`selectedASRProviderId`、`defaultTTSPlaybackSpeed`、`ttsOnlyReadQuoted`、`ttsOnlyReadOutsideBrackets`、`autoPlayTTSAfterGeneration` 等字段与 DataStore key 未动；`TTSProviderSetting`、`ASRProviderSetting` 逐字节未改；`DEFAULT_TTS_PROVIDERS`（只剩 SystemTTS）与 TTS 补回逻辑保留；`LocalToolOption.Tts` 枚举值保留，旧助手配置仍可反序列化；`speech` 的 `build.gradle.kts` 未精简，仍带 media3 等用不到的依赖。与 C4 不同，这里选择的是彻底清理而非保留孤儿，理由是语音功能的入口、实现、文案与音效已全部消失，留着孤儿只会增加维护时的误判。合并注意：app 侧语音代码是上游活跃区域（3.1.0 就加了语音模式开关），恢复实现时需补齐上述入口；`speech` 模块上游虽未改动，但按本行删空后不要因界面上看不到而恢复。`SettingPage`、`SettingPreferencesGeneralPage`、`ChatInput`、`ChatMessageActions`、`ChatPage`、`ChatVM`、`ChatService`、`RouteActivity` 均为热区，冲突时以保留删除为准 |
 | C6 | 移除聊天回复建议（计划中） | 生成侧 `ChatService` 里的建议请求（`generateSuggestion` 与 `if (!settings.enableSuggestion) return@runCatching` 的判断仍在 `ChatService`，3.0.0 只把提示词与请求构建移到 `ConversationMetaGenerator`）、`data/ai/prompts/Suggestion.kt`（其 `DEFAULT_SUGGESTION_PROMPT` 被 `Settings.kt` 与 `SettingModelPromptPage` 当默认值引用，删文件前要把常量挪走或内联）；UI 侧 `ChatList` 的建议 chip 列表、`ChatPage` 的 `onClickSuggestion`、`SettingModelPage` 的开关、`SettingModelPromptPage` 的提示词编辑项 | 不用这个功能，每条回复都会多一次生成请求 | 保留存储与协议：`Settings.enableSuggestion`、`Settings.suggestionPrompt` 的字段与 DataStore key 不动，`Conversation.chatSuggestions` 是 Room 字段（`ConversationEntity.chatSuggestions`）不能删，`WebDto.chatSuggestions` 一并保留。只断入口与生成，不删字段 |
-| C7 | 替换官方 logo 为自己的图标（计划中） | `app/src/main/res/mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/` 下的 `ic_launcher.png`、`ic_launcher_background.png`、`ic_launcher_foreground.png`、`ic_launcher_monochrome.png`，5 个密度共 20 个 png；`mipmap-anydpi-v26/ic_launcher.xml` 的结构不变 | 让桌面上装的这个版本与官方版一眼区分开 | 只替换 png 内容，保持文件名与目录结构不变，让上游对 `ic_launcher.xml` 逻辑的改动仍能自动合并。`monochrome` 必须一起做，否则 Android 13 的主题图标会退回官方样式。设置-关于页直接复用 `R.mipmap.ic_launcher`，无需单独改。上游 3.0.0 的 `bf04cde9` 调整过图标配色，此后上游再改这些 png 时会与本行冲突，处理方式是一律保留我们自己的 png。它同时改了 `web-ui/public/favicon.ico`、`docs/icon.png`、`docs/img/poster.png`，这几处不在本行范围内，若也要换成自己的品牌需单独处理 |
+| C7 | 替换官方 logo 为自己的图标（计划中） | `app/src/main/res/mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/` 下的 `ic_launcher.png`、`ic_launcher_background.png`、`ic_launcher_foreground.png`、`ic_launcher_monochrome.png`，5 个密度共 20 个 png；`mipmap-anydpi-v26/ic_launcher.xml` 的结构不变 | 让桌面上装的这个版本与官方版一眼区分开 | 只替换 png 内容，保持文件名与目录结构不变，让上游对 `ic_launcher.xml` 逻辑的改动仍能自动合并。`monochrome` 必须一起做，否则 Android 13 的主题图标会退回官方样式。设置-关于页直接复用 `R.mipmap.ic_launcher`，无需单独改。上游 3.1.0 的 `bf04cde9` 调整过图标配色，此后上游再改这些 png 时会与本行冲突，处理方式是一律保留我们自己的 png。它同时改了 `web-ui/public/favicon.ico`、`docs/icon.png`、`docs/img/poster.png`，这几处不在本行范围内，若也要换成自己的品牌需单独处理 |
 
 ## 构建
 

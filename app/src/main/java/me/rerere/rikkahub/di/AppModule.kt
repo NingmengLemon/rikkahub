@@ -4,8 +4,9 @@ import com.google.firebase.Firebase
 import com.google.firebase.crashlytics.crashlytics
 import kotlinx.serialization.json.Json
 import me.rerere.rikkahub.AppScope
-import me.rerere.rikkahub.data.ai.tools.local.LocalTools
+import me.rerere.rikkahub.data.ai.ChatRequestFactory
 import me.rerere.rikkahub.data.ai.tools.ChatToolFactory
+import me.rerere.rikkahub.data.ai.tools.local.LocalTools
 import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.service.ChatNotificationManager
 import me.rerere.rikkahub.service.ChatService
@@ -70,11 +71,24 @@ val appModule = module {
 
     single {
         ChatToolFactory(
+            context = get(),
             memoryRepository = get(),
             conversationRepository = get(),
             localTools = get(),
             mcpManager = get(),
             skillManager = get(),
+            workspaceRepository = get(),
+        )
+    }
+
+    single {
+        ChatRequestFactory(
+            context = get(),
+            providerManager = get(),
+            usageRecorder = get(),
+            chatToolFactory = get(),
+            memoryRepository = get(),
+            templateTransformer = get(),
             workspaceRepository = get(),
         )
     }
@@ -86,16 +100,12 @@ val appModule = module {
             appEventBus = get(),
             settingsStore = get(),
             conversationRepo = get(),
-            memoryRepository = get(),
-            generationLoop = get(),
+            requestFactory = get(),
             memoryConsolidationScheduler = get(),
             translationHandler = get(),
-            templateTransformer = get(),
-            providerManager = get(),
-            chatToolFactory = get(),
+            metaGenerator = get(),
             mcpManager = get(),
             filesManager = get(),
-            workspaceRepository = get(),
             folderRepository = get()
         )
     }
