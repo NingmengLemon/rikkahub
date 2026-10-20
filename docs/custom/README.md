@@ -28,7 +28,7 @@
 
 远端默认分支是 `custom`。本地 `origin/HEAD` 的缓存仍指向 `origin/master`，可用 `git remote set-head origin -a` 刷新。
 
-上游已引入 Spotless + ktlint（`76e25d95`，在 3.0.0 发布之后），其 `ratchetFrom("origin/master")` 写死了 `origin/master`，只检查相对该引用改动过的文件。因此 `master` 必须保持跟随上游并存在于 `origin`，不要清理这个引用：本地 `master` 已快进到 `e5bb7073` 但尚未推送到 `origin` 时，`origin/master` 仍停在合并前的基点，`spotlessCheck` 会把上游那一整批文件当作改动过的来检查，报出与本地定制无关的格式违规。
+上游已引入 Spotless + ktlint（`76e25d95`，在 3.0.0 发布之后），其 `ratchetFrom("origin/master")` 写死了 `origin/master`，只检查相对该引用改动过的文件。因此 `master` 必须保持跟随上游并存在于 `origin`，不要清理这个引用：本地 `master` 快进后若尚未推送，`origin/master` 仍停在旧基点，`spotlessCheck` 会把上游那一整批文件当作改动过的来检查，报出与本地定制无关的格式违规。
 
 ## 上游同步流程
 
@@ -56,7 +56,7 @@ $env:JAVA_HOME='E:\WorkBench\Java\jdk-23.0.2'; $env:PATH="$env:JAVA_HOME\bin;$en
 
 ### 当前待处理的同步
 
-无。基点已随 3.1.0 的合并前移到 `e5bb7073`，下一次同步从该点开始。
+无。基点在上游 master 的当前头 `5203601f`，下一次同步从该点开始。
 
 ## 定制原则
 
@@ -106,7 +106,7 @@ git log --oneline master..custom
 
 ### 避开上游热区
 
-两个口径都看，用途不同。以下为 2026-10-20 在 `master`（上游 3.1.0 合并后）上实测，路径取精确文件路径（用通配符会多计）。
+两个口径都看，用途不同。以下为 2026-10-20 在 `e5bb7073`（上游 3.1.0 的基点）上实测，路径取精确文件路径（用通配符会多计）。
 
 全历史改动次数，反映该文件长期被上游改动的密度，也意味着其中积累的结构性变化多：
 
