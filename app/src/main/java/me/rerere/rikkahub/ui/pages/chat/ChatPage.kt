@@ -436,10 +436,6 @@ private fun ChatPageContent(
                 onUpdateMessage = { newNode ->
                     vm.selectMessageNode(newNode.id, newNode.selectIndex)
                 },
-                onClickSuggestion = { suggestion ->
-                    inputState.editingMessage = null
-                    inputState.setMessageText(suggestion)
-                },
                 onTranslate = { message, locale ->
                     vm.translateMessage(message, locale)
                 },

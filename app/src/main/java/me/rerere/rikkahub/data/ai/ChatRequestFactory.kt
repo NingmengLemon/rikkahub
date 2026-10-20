@@ -285,7 +285,7 @@ internal suspend fun UIMessage.transformNewParts(
     return transformed.copy(parts = parts.take(newPartsFrom) + transformed.parts)
 }
 
-/** 标题、建议、记忆整理这类后台请求的参数：只带模型自己的自定义请求头和请求体 */
+/** 标题、记忆整理这类后台请求的参数：只带模型自己的自定义请求头和请求体 */
 internal fun backgroundTextGenerationParams(
     model: Model,
     sessionId: Uuid,

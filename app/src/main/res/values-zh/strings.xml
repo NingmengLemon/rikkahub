@@ -681,8 +681,6 @@
   <string name="setting_model_page_ocr_prompt_vars">变量：图像数据：{images}</string>
   <string name="setting_model_page_prompt">提示词</string>
   <string name="setting_model_page_reset_to_default">重置为默认</string>
-  <string name="setting_model_page_suggestion_model">聊天建议模型</string>
-  <string name="setting_model_page_suggestion_model_desc">用于生成聊天建议的模型。未设置时使用快速模型</string>
   <string name="setting_model_page_suggestion_prompt_vars">变量: 对话内容: {content}, 语言: {locale}</string>
   <string name="setting_model_page_title">模型设置</string>
   <string name="setting_model_page_title_model">标题总结模型</string>
@@ -973,13 +971,11 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="setting_model_page_tab_prompt">提示词</string>
   <string name="setting_model_page_prompt_translation">翻译</string>
   <string name="setting_model_page_prompt_title">标题生成</string>
-  <string name="setting_model_page_prompt_suggestion">聊天回复建议</string>
   <string name="setting_model_page_prompt_ocr">OCR识别</string>
   <string name="setting_display_page_bubble_opacity_title">气泡不透明度</string>
   <string name="setting_provider_page_include_history_reasoning">回传历史思考过程</string>
   <string name="setting_model_page_fast_model">快速模型</string>
-  <string name="setting_model_page_fast_model_desc">用于生成标题、聊天建议以及执行其他快速或后台任务</string>
-  <string name="setting_model_page_enable_suggestion">启用聊天建议</string>
+  <string name="setting_model_page_fast_model_desc">用于生成标题以及执行其他快速或后台任务</string>
   <string name="setting_model_page_enable_auto_title">自动生成对话标题</string>
   <string name="assistant_page_gradient_background">渐变背景</string>
   <string name="assistant_page_gradient_background_desc">在聊天页面使用动态渐变背景</string>

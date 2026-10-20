@@ -536,7 +536,7 @@ class ChatService(
         var senderName = ""
         try {
             val settings = settingsStore.awaitLoaded()
-            // 清掉上一轮的建议；没法继续执行的工具调用发给模型会被拒绝，先去掉。
+            // 清掉已存储的建议；没法继续执行的工具调用发给模型会被拒绝，先去掉。
             // 重新生成时只清理要发给模型的节点，被重新生成的节点保持原样，旧回复留作分支
             val conversation = session.update { latest ->
                 val untilNode = regenerateNodeId
@@ -612,10 +612,9 @@ class ChatService(
             }
 
             val reason = checkNotNull(finishReason)
-            // 等待审批时这一轮还没结束，标题、建议和记忆整理等审批之后再做
+            // 等待审批时这一轮还没结束，标题与记忆整理等审批之后再做
             if (reason !is AgentFinishReason.AwaitingApproval) {
                 sessionManager.launchWithSession(conversationId) { generateTitle(conversationId) }
-                sessionManager.launchWithSession(conversationId) { generateSuggestion(conversationId) }
                 if (turn.assistant.enableMemory) memoryConsolidationScheduler.onTurnFinished(session.state.value)
             }
             return TurnResult.Finished(reason)
@@ -717,32 +716,6 @@ class ChatService(
                     title = context.getString(R.string.error_title_generate_title),
                     solution = ChatErrorSolution.CheckFastModelSettings,
                 )
-            }
-        }
-    }
-
-    // ---- 生成建议 ----
-
-    private suspend fun generateSuggestion(conversationId: Uuid): Unit = withContext(Dispatchers.IO) {
-        sessionManager.withSession<Unit>(conversationId) { session ->
-            runCatching {
-                val settings = settingsStore.awaitLoaded()
-                if (!settings.enableSuggestion) return@runCatching
-
-                // 上一轮的建议在这一轮开始时已经清掉了
-                ensureInitialized(session)
-                val incarnation = session.incarnation
-                val suggestions = metaGenerator.generateSuggestions(settings, session.state.value)
-                    ?: return@runCatching
-
-                // 只写建议这一列，理由同标题
-                session.updateMetadata(
-                    transform = { it.copy(chatSuggestions = suggestions) },
-                    persist = { conversationRepo.updateChatSuggestions(conversationId, suggestions) },
-                    expectedIncarnation = incarnation,
-                )
-            }.onFailure {
-                it.printStackTrace()
             }
         }
     }

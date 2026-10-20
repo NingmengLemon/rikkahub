@@ -35,12 +35,10 @@ import me.rerere.ai.core.ReasoningLevel
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.ArrowRight01
 import me.rerere.hugeicons.stroke.Heading
-import me.rerere.hugeicons.stroke.Idea01
 import me.rerere.hugeicons.stroke.ScanText
 import me.rerere.hugeicons.stroke.Translate
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_OCR_PROMPT
-import me.rerere.rikkahub.data.ai.prompts.DEFAULT_SUGGESTION_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TITLE_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TRANSLATION_PROMPT
 import me.rerere.rikkahub.data.datastore.Settings
@@ -140,14 +138,6 @@ private enum class PromptSlot(
         default = DEFAULT_TITLE_PROMPT,
         get = { it.titlePrompt },
         set = { settings, value -> settings.copy(titlePrompt = value) },
-    ),
-    SUGGESTION(
-        icon = HugeIcons.Idea01,
-        title = R.string.setting_model_page_prompt_suggestion,
-        variables = R.string.setting_model_page_suggestion_prompt_vars,
-        default = DEFAULT_SUGGESTION_PROMPT,
-        get = { it.suggestionPrompt },
-        set = { settings, value -> settings.copy(suggestionPrompt = value) },
     ),
     OCR(
         icon = HugeIcons.ScanText,

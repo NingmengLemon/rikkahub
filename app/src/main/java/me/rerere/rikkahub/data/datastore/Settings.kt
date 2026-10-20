@@ -9,7 +9,6 @@ import me.rerere.asr.ASRProviderSetting
 import me.rerere.mediagen.provider.MediaGenerationProviderSetting
 import me.rerere.rikkahub.data.ai.mcp.McpServerConfig
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_OCR_PROMPT
-import me.rerere.rikkahub.data.ai.prompts.DEFAULT_SUGGESTION_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TITLE_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TRANSLATION_PROMPT
 import me.rerere.rikkahub.data.model.Assistant
@@ -25,6 +24,24 @@ import me.rerere.search.SearchCommonOptions
 import me.rerere.search.SearchServiceOptions
 import me.rerere.tts.provider.TTSProviderSetting
 import kotlin.uuid.Uuid
+
+// 聊天回复建议已不再生成，这个默认值只为让已存储的 suggestionPrompt 仍有定义
+private val DEFAULT_SUGGESTION_PROMPT = """
+    I will provide you with some chat content in the `<content>` block, including conversations between the User and the AI assistant.
+    You need to act as the **User** to reply to the assistant, generating 3~5 appropriate and contextually relevant responses to help the assistant improve its answers.
+
+    Rules:
+    1. Reply directly with suggestions, do not add any formatting, and separate suggestions with newlines, no need to add markdown list formats.
+    2. Use {locale} language.
+    3. Ensure each suggestion is valid.
+    4. Each suggestion should not exceed 10 characters.
+    5. Imitate the user's previous conversational style.
+    6. Act as a User, not an Assistant!
+
+    <content>
+    {content}
+    </content>
+""".trimIndent()
 
 @Serializable
 data class Settings(

@@ -167,7 +167,7 @@ private fun ModelSettingsPage(settings: Settings, vm: SettingVM, contentPadding:
         item {
             val containerColor = MaterialTheme.colorScheme.tertiaryContainer
             val contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-            // 标题和聊天建议都由快速模型生成，相关的选项跟它放在一组
+            // 标题由快速模型生成，相关的选项跟它放在一组
             CardGroup {
                 modelItem(
                     icon = HugeIcons.Zap,
@@ -194,13 +194,6 @@ private fun ModelSettingsPage(settings: Settings, vm: SettingVM, contentPadding:
                         vm.updateSettings { latest -> latest.copy(enableAutoTitle = it) }
                     },
                     headlineContent = { Text(stringResource(R.string.setting_model_page_enable_auto_title)) },
-                )
-                switchItem(
-                    checked = settings.enableSuggestion,
-                    onCheckedChange = {
-                        vm.updateSettings { latest -> latest.copy(enableSuggestion = it) }
-                    },
-                    headlineContent = { Text(stringResource(R.string.setting_model_page_enable_suggestion)) },
                 )
             }
         }

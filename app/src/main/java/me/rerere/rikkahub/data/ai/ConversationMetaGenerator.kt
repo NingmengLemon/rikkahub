@@ -13,7 +13,7 @@ import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.utils.applyPlaceholders
 import java.util.Locale
 
-/** 用快速模型生成会话的标题和聊天建议，只负责请求模型，写回会话由调用方处理 */
+/** 用快速模型生成会话标题，只负责请求模型，写回会话由调用方处理 */
 class ConversationMetaGenerator(
     private val context: Context,
     private val providerManager: ProviderManager,
@@ -35,25 +35,6 @@ class ConversationMetaGenerator(
             UsageSource.TITLE
         )
             .trim()
-    }
-
-    /** 没有配置快速模型时返回 null */
-    suspend fun generateSuggestions(settings: Settings, conversation: Conversation): List<String>? {
-        val model = settings.findModelById(settings.fastModelId) ?: return null
-        val provider = model.findProvider(settings.providers) ?: return null
-        return generate(
-            settings,
-            model,
-            provider,
-            conversation,
-            settings.suggestionPrompt,
-            recentMessages = 8,
-            UsageSource.SUGGESTION,
-        )
-            .split("\n")
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .take(10)
     }
 
     private suspend fun generate(

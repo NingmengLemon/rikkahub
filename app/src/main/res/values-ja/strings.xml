@@ -662,8 +662,6 @@
   <string name="setting_model_page_ocr_prompt_vars">変数: 画像データ: {images}</string>
   <string name="setting_model_page_prompt">プロンプト</string>
   <string name="setting_model_page_reset_to_default">デフォルトにリセット</string>
-  <string name="setting_model_page_suggestion_model">チャット提案モデル</string>
-  <string name="setting_model_page_suggestion_model_desc">会話の提案を生成するモデル。設定されていない場合は高速モデルを使用します</string>
   <string name="setting_model_page_suggestion_prompt_vars">変数: 会話内容: {content}, 言語: {locale}</string>
   <string name="setting_model_page_title">モデル設定</string>
   <string name="setting_model_page_title_model">タイトル要約モデル</string>
@@ -961,13 +959,11 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="setting_model_page_tab_prompt">プロンプト</string>
   <string name="setting_model_page_prompt_translation">翻訳</string>
   <string name="setting_model_page_prompt_title">タイトル生成</string>
-  <string name="setting_model_page_prompt_suggestion">チャット返信の提案</string>
   <string name="setting_model_page_prompt_ocr">OCR認識</string>
   <string name="setting_display_page_bubble_opacity_title">吹き出しの不透明度</string>
   <string name="setting_provider_page_include_history_reasoning">履歴の思考過程を送信</string>
   <string name="setting_model_page_fast_model">高速モデル</string>
-  <string name="setting_model_page_fast_model_desc">タイトル、チャット候補、その他の高速タスクやバックグラウンドタスクに使用するモデル</string>
-  <string name="setting_model_page_enable_suggestion">チャット提案を有効にする</string>
+  <string name="setting_model_page_fast_model_desc">タイトル、その他の高速タスクやバックグラウンドタスクに使用するモデル</string>
   <string name="setting_model_page_enable_auto_title">会話タイトルを自動生成する</string>
   <string name="assistant_page_gradient_background">グラデーション背景</string>
   <string name="assistant_page_gradient_background_desc">チャットページで動的なグラデーション背景を使用します</string>

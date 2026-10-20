@@ -662,8 +662,6 @@
   <string name="setting_model_page_ocr_prompt_vars">變數：圖片資料：{images}</string>
   <string name="setting_model_page_prompt">提示詞</string>
   <string name="setting_model_page_reset_to_default">重置為預設值</string>
-  <string name="setting_model_page_suggestion_model">聊天建議模型</string>
-  <string name="setting_model_page_suggestion_model_desc">用於生成聊天建議的模型。未設置時使用快速模型</string>
   <string name="setting_model_page_suggestion_prompt_vars">變數: 對話內容: {content}, 語言: {locale}</string>
   <string name="setting_model_page_title">模型設定</string>
   <string name="setting_model_page_title_model">標題摘要模型</string>
@@ -959,13 +957,11 @@
   <string name="setting_model_page_tab_prompt">提示詞</string>
   <string name="setting_model_page_prompt_translation">翻譯</string>
   <string name="setting_model_page_prompt_title">標題生成</string>
-  <string name="setting_model_page_prompt_suggestion">聊天回覆建議</string>
   <string name="setting_model_page_prompt_ocr">OCR 辨識</string>
   <string name="setting_display_page_bubble_opacity_title">氣泡透明度</string>
   <string name="setting_provider_page_include_history_reasoning">回傳歷史思考過程</string>
   <string name="setting_model_page_fast_model">快速模型</string>
-  <string name="setting_model_page_fast_model_desc">用於生成標題、聊天建議以及執行其他快速或背景任務</string>
-  <string name="setting_model_page_enable_suggestion">啟用聊天建議</string>
+  <string name="setting_model_page_fast_model_desc">用於生成標題以及執行其他快速或背景任務</string>
   <string name="setting_model_page_enable_auto_title">自動生成對話標題</string>
   <string name="assistant_page_gradient_background">漸層背景</string>
   <string name="assistant_page_gradient_background_desc">在聊天頁面上使用動態漸變背景</string>

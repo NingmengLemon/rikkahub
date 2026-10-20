@@ -19,7 +19,7 @@ import kotlin.concurrent.thread
  *
  * 需要先应用 `app/baselineprofile/mock-provider.patch`，让 app 的默认模型指向这里。
  * 流式请求返回思考过程 + Markdown 正文，正文末尾带递增的编号，方便生成器判断这一轮的回复已经渲染完。
- * 非流式请求是标题和建议生成，返回固定文本。
+ * 非流式请求只剩标题生成，返回固定文本。
  */
 class MockOpenAIServer(private val port: Int = PORT) {
     private val serverSocket = ServerSocket()
@@ -62,8 +62,8 @@ class MockOpenAIServer(private val port: Int = PORT) {
         if (request.optBoolean("stream")) {
             streamReply(output, replyCount.incrementAndGet())
         } else {
-            val content = if (body.contains("suggestions")) SUGGESTIONS else TITLE
-            output.writeResponse(200, "application/json", completion(content).toString())
+            // 非流式请求只剩标题生成这一条路径
+            output.writeResponse(200, "application/json", completion(TITLE).toString())
         }
     }
 
@@ -78,7 +78,8 @@ class MockOpenAIServer(private val port: Int = PORT) {
                 .put("object", "chat.completion.chunk")
                 .put("model", "mock-model")
                 .put(
-                    "choices", JSONArray().put(
+                    "choices",
+                    JSONArray().put(
                         JSONObject()
                             .put("index", 0)
                             .put("delta", delta)
@@ -107,7 +108,8 @@ class MockOpenAIServer(private val port: Int = PORT) {
         .put("object", "chat.completion")
         .put("model", "mock-model")
         .put(
-            "choices", JSONArray().put(
+            "choices",
+            JSONArray().put(
                 JSONObject()
                     .put("index", 0)
                     .put("message", JSONObject().put("role", "assistant").put("content", content))
@@ -144,7 +146,6 @@ class MockOpenAIServer(private val port: Int = PORT) {
         private const val CHUNK_DELAY_MS = 20L
 
         private const val TITLE = "Hello RikkaHub"
-        private const val SUGGESTIONS = "再举个例子\n解释一下代码\n换个写法"
 
         private val REASONING = """
             用户发来了一段 Markdown 示例，我需要用同样丰富的格式回复：标题、列表、表格、代码块和公式都要覆盖到。
