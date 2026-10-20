@@ -163,14 +163,13 @@
   <string name="backup_page_delete_success">Удаление выполнено успешно</string>
   <string name="backup_page_export_desc">Экспортировать данные приложения в файл</string>
   <string name="backup_page_exporting">Экспорт…</string>
+  <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
+  <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">Файлы</string>
-  <string name="backup_page_import_chatbox_desc">Импортировать конфигурации поставщика ChatBox и полную историю чатов</string>
-  <string name="backup_page_import_cherry_studio_desc">Импортировать конфигурации поставщика Cherry Studio</string>
   <string name="backup_page_import_desc">Импортировать локальный файл резервной копии</string>
+  <string name="backup_page_import_from_official">Import from RikkaHub</string>
+  <string name="backup_page_import_official_desc">Export a backup from the official RikkaHub first, then pick that file here</string>
   <string name="backup_page_import_export">Локальный</string>
-  <string name="backup_page_import_from_chatbox">Импорт из ChatBox</string>
-  <string name="backup_page_import_from_cherry_studio">Импорт из Cherry Studio</string>
-  <string name="backup_page_import_from_other_app">Импорт из другого приложения</string>
   <string name="backup_page_importing">Импорт…</string>
   <string name="backup_page_loading_failed">Не удалось загрузить файлы резервной копии: %s</string>
   <string name="backup_page_local_backup_export">Экспорт в файл</string>
@@ -195,8 +194,6 @@
   <string name="backup_page_restore_success">Восстановление выполнено успешно</string>
   <string name="backup_page_restoring">Восстановление...</string>
   <string name="backup_page_s3_access_key_id">Идентификатор ключа доступа</string>
-  <string name="backup_page_s3_backup">Резервное копирование S3</string>
-  <string name="backup_page_s3_backup_files">Файлы резервного копирования S3</string>
   <string name="backup_page_s3_bucket">Bucket</string>
   <string name="backup_page_s3_endpoint">Конечная точка</string>
   <string name="backup_page_s3_region">Регион</string>
@@ -1222,7 +1219,7 @@
   <string name="media_creation_error_kind_unsupported">%1$s не поддерживает этот тип модели</string>
   <string name="media_creation_error_task_exists">Задача уже существует</string>
   <string name="setting_media_page_empty">Пока нет провайдеров генерации медиа. Нажмите + вверху, чтобы добавить.</string>
-  <string name="setting_media_page_s3_desc">Некоторые API принимают ресурсы только по публичным URL (например, референсные изображения и референсные видео для генерации видео). Настройте здесь S3-совместимый сервис объектного хранилища: локальные файлы сначала загружаются в его бакет, а затем передаются в API как временные URL; загруженные файлы автоматически удаляются через 7 дней. Эта конфигурация не зависит от S3, используемого для резервных копий.</string>
+  <string name="setting_media_page_s3_desc">Некоторые API принимают ресурсы только по публичным URL (например, референсные изображения и референсные видео для генерации видео). Настройте здесь S3-совместимый сервис объектного хранилища: локальные файлы сначала загружаются в его бакет, а затем передаются в API как временные URL; загруженные файлы автоматически удаляются через 7 дней.</string>
   <string name="setting_media_page_provider_type">Тип провайдера</string>
   <string name="setting_media_page_provider_name">Название</string>
   <string name="setting_media_page_workspace_id">ID рабочей области</string>

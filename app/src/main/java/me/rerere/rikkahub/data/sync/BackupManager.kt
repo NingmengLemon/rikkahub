@@ -32,7 +32,13 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
-/** Shared archive format and restore lifecycle for local, WebDAV and S3 backups. */
+/** 打包进度：已写入的条目数与总条目数，含 settings.json 与数据库快照。 */
+data class BackupProgress(val done: Int, val total: Int) {
+    val fraction: Float
+        get() = if (total <= 0) 0f else (done.toFloat() / total).coerceIn(0f, 1f)
+}
+
+/** Shared archive format and restore lifecycle for local and WebDAV backups. */
 class BackupManager(
     private val context: Context,
     private val database: AppDatabase,
@@ -41,38 +47,41 @@ class BackupManager(
 ) {
     private val restoreMutex = Mutex()
 
-    suspend fun createBackup(includeDatabase: Boolean, includeFiles: Boolean): File = withContext(Dispatchers.IO) {
+    suspend fun createBackup(
+        includeDatabase: Boolean,
+        includeFiles: Boolean,
+        onProgress: ((BackupProgress) -> Unit)? = null,
+    ): File = withContext(Dispatchers.IO) {
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
         val archive = File.createTempFile("backup_${timestamp}_", ".zip", context.cacheDir)
         val staging = Files.createTempDirectory(context.cacheDir.toPath(), "backup-").toFile()
         try {
             val settings = settingsStore.awaitLoaded()
+            // 先把附件列出来，才能给出确定的总条目数；列表里只是路径，不占多少内存
+            val attachments = if (includeFiles) collectAttachments() else emptyList()
+            val total = 1 + (if (includeDatabase) 1 else 0) + attachments.size
+            var done = 0
+            fun advance() {
+                done++
+                onProgress?.invoke(BackupProgress(done, total))
+            }
+
             ZipOutputStream(FileOutputStream(archive)).use { zip ->
                 zip.putNextEntry(ZipEntry("settings.json"))
                 val settingsJson = json.encodeSettings(settings, settingsStore.launchCountFlow.first())
                 zip.write(settingsJson.toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
+                advance()
                 if (includeDatabase) {
                     val snapshot = File(staging, SQLiteConfiguration.DATABASE_NAME)
                     DatabaseBackup.createSnapshot(database.openHelper.writableDatabase, snapshot)
                     addFile(zip, snapshot, DatabaseBackup.ARCHIVE_DATABASE)
+                    advance()
                 }
-                if (includeFiles) {
-                    for (folder in ATTACHMENT_FOLDERS) {
-                        val directory = File(context.filesDir, folder)
-                        val files = if (folder in NESTED_ATTACHMENT_FOLDERS) directory.walkTopDown().asSequence()
-                        else directory.listFiles().orEmpty().asSequence()
-                        for (file in files.filter { it.isFile }) {
-                            currentCoroutineContext().ensureActive()
-                            // A media result still being downloaded is incomplete and gets renamed when it finishes.
-                            if (folder == FileFolders.MEDIA_CREATION &&
-                                file.name.endsWith(MediaCreationFiles.PARTIAL_SUFFIX)
-                            ) continue
-                            val relative = file.relativeTo(directory).invariantSeparatorsPath
-                            PendingRestore.resolveInside(directory, relative)
-                            addFile(zip, file, "$folder/$relative")
-                        }
-                    }
+                for (attachment in attachments) {
+                    currentCoroutineContext().ensureActive()
+                    addFile(zip, attachment.file, attachment.archiveName)
+                    advance()
                 }
             }
             archive
@@ -82,6 +91,26 @@ class BackupManager(
         } finally {
             staging.deleteRecursively()
         }
+    }
+
+    private suspend fun collectAttachments(): List<AttachmentEntry> {
+        val result = ArrayList<AttachmentEntry>()
+        for (folder in ATTACHMENT_FOLDERS) {
+            val directory = File(context.filesDir, folder)
+            val files = if (folder in NESTED_ATTACHMENT_FOLDERS) directory.walkTopDown().asSequence()
+            else directory.listFiles().orEmpty().asSequence()
+            for (file in files.filter { it.isFile }) {
+                currentCoroutineContext().ensureActive()
+                // A media result still being downloaded is incomplete and gets renamed when it finishes.
+                if (folder == FileFolders.MEDIA_CREATION &&
+                    file.name.endsWith(MediaCreationFiles.PARTIAL_SUFFIX)
+                ) continue
+                val relative = file.relativeTo(directory).invariantSeparatorsPath
+                PendingRestore.resolveInside(directory, relative)
+                result += AttachmentEntry(file = file, archiveName = "$folder/$relative")
+            }
+        }
+        return result
     }
 
     suspend fun stageRestore(archive: File, includeDatabase: Boolean, includeFiles: Boolean) =
@@ -165,6 +194,8 @@ class BackupManager(
         file.inputStream().use { it.copyTo(zip) }
         zip.closeEntry()
     }
+
+    private data class AttachmentEntry(val file: File, val archiveName: String)
 
     companion object {
         private val ATTACHMENT_FOLDERS =

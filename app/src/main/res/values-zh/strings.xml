@@ -163,14 +163,13 @@
   <string name="backup_page_delete_success">删除成功</string>
   <string name="backup_page_export_desc">导出APP数据为文件</string>
   <string name="backup_page_exporting">正在导出...</string>
+  <string name="backup_page_export_packing">正在打包 %1$d / %2$d</string>
+  <string name="backup_page_saving">正在保存...</string>
   <string name="backup_page_files">文件</string>
-  <string name="backup_page_import_chatbox_desc">导入 ChatBox 提供商配置和完整聊天记录</string>
-  <string name="backup_page_import_cherry_studio_desc">导入Cherry Studio提供商配置</string>
   <string name="backup_page_import_desc">导入本地备份文件</string>
+  <string name="backup_page_import_from_official">从 RikkaHub 导入</string>
+  <string name="backup_page_import_official_desc">先在官方 RikkaHub 中导出备份，再在此选择该文件</string>
   <string name="backup_page_import_export">本地</string>
-  <string name="backup_page_import_from_chatbox">从ChatBox导入</string>
-  <string name="backup_page_import_from_cherry_studio">从Cherry Studio导入</string>
-  <string name="backup_page_import_from_other_app">从其他APP导入</string>
   <string name="backup_page_importing">正在恢复...</string>
   <string name="backup_page_loading_failed">加载备份文件失败: %s</string>
   <string name="backup_page_local_backup_export">导出为文件</string>
@@ -195,8 +194,6 @@
   <string name="backup_page_restore_success">恢复成功</string>
   <string name="backup_page_restoring">恢复中...</string>
   <string name="backup_page_s3_access_key_id">访问密钥 ID</string>
-  <string name="backup_page_s3_backup">S3备份</string>
-  <string name="backup_page_s3_backup_files">S3备份文件</string>
   <string name="backup_page_s3_bucket">Bucket</string>
   <string name="backup_page_s3_endpoint">端点</string>
   <string name="backup_page_s3_path_style">路径样式</string>
@@ -1219,7 +1216,7 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="setting_media_page_edit_provider">编辑提供商</string>
   <string name="setting_media_page_add_provider">添加提供商</string>
   <string name="setting_media_page_empty">还没有媒体生成提供商，点右上角添加</string>
-  <string name="setting_media_page_s3_desc">部分接口只接受公网地址的素材（如视频生成的参考图、参考视频）。在这里配置一个 S3 兼容的对象存储服务后，本地文件会先上传到它的桶里，再以临时地址交给接口；上传的文件 7 天后自动清理。此配置与备份的 S3 互相独立。</string>
+  <string name="setting_media_page_s3_desc">部分接口只接受公网地址的素材（如视频生成的参考图、参考视频）。在这里配置一个 S3 兼容的对象存储服务后，本地文件会先上传到它的桶里，再以临时地址交给接口；上传的文件 7 天后自动清理。</string>
   <string name="setting_media_page_provider_type">提供商类型</string>
   <string name="setting_media_page_provider_name">名称</string>
   <string name="setting_media_page_workspace_id">业务空间 ID</string>

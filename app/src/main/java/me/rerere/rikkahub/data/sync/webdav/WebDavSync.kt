@@ -6,6 +6,7 @@ import io.ktor.client.HttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.sync.BackupManager
+import me.rerere.rikkahub.data.sync.BackupProgress
 import me.rerere.rikkahub.data.datastore.WebDavConfig
 import me.rerere.rikkahub.utils.fileSizeToString
 import java.io.File
@@ -102,9 +103,13 @@ class WebDavSync(
         restoreFromBackupFile(file, config)
     }
 
-    suspend fun prepareBackupFile(config: WebDavConfig): File = backupManager.createBackup(
+    suspend fun prepareBackupFile(
+        config: WebDavConfig,
+        onProgress: ((BackupProgress) -> Unit)? = null,
+    ): File = backupManager.createBackup(
         includeDatabase = WebDavConfig.BackupItem.DATABASE in config.items,
         includeFiles = WebDavConfig.BackupItem.FILES in config.items,
+        onProgress = onProgress,
     )
 
     private suspend fun restoreFromBackupFile(backupFile: File, config: WebDavConfig) = backupManager.stageRestore(

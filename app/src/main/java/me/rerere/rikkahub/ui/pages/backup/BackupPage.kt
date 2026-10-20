@@ -24,7 +24,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.rerere.hugeicons.HugeIcons
-import me.rerere.hugeicons.stroke.Bucket
 import me.rerere.hugeicons.stroke.CloudServer
 import me.rerere.hugeicons.stroke.Notification01
 import me.rerere.hugeicons.stroke.SmartPhone01
@@ -35,7 +34,6 @@ import me.rerere.rikkahub.ui.components.ui.PagerTabs
 import me.rerere.rikkahub.ui.pages.backup.components.BackupDialog
 import me.rerere.rikkahub.ui.pages.backup.tabs.ImportExportTab
 import me.rerere.rikkahub.ui.pages.backup.tabs.ReminderTab
-import me.rerere.rikkahub.ui.pages.backup.tabs.S3Tab
 import me.rerere.rikkahub.ui.pages.backup.tabs.WebDavTab
 import me.rerere.rikkahub.ui.theme.CustomColors
 import org.koin.androidx.compose.koinViewModel
@@ -46,7 +44,6 @@ private enum class BackupTab(
 ) : PagerTab {
     LOCAL(HugeIcons.SmartPhone01, R.string.backup_page_import_export),
     WEBDAV(HugeIcons.CloudServer, R.string.backup_page_webdav_backup),
-    S3(HugeIcons.Bucket, R.string.backup_page_s3_backup),
     REMINDER(HugeIcons.Notification01, R.string.backup_page_reminder);
 
     override val label: String
@@ -109,12 +106,6 @@ fun BackupPage(vm: BackupVM = koinViewModel()) {
                         )
                     }
 
-                    BackupTab.S3 -> {
-                        S3Tab(
-                            vm = vm,
-                            onShowRestartDialog = { showRestartDialog = true }
-                        )
-                    }
 
                     BackupTab.REMINDER -> {
                         ReminderTab(vm = vm)

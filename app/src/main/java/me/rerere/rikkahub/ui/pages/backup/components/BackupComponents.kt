@@ -93,7 +93,7 @@ internal fun BackupActionIcon(
     }
 }
 
-// 「备份内容」多选项，本地、WebDAV、S3 共用
+// 「备份内容」多选项，本地与 WebDAV 页共用
 internal fun <T> CardGroupScope.backupContentItem(
     options: List<T>,
     selected: List<T>,
@@ -117,7 +117,7 @@ internal fun <T> CardGroupScope.backupContentItem(
     }
 }
 
-// WebDAV / S3 页顶部的状态分组：上次备份时间，以及进入备份文件列表的入口
+// WebDAV 页顶部的状态分组：上次备份时间，以及进入备份文件列表的入口
 @Composable
 internal fun RemoteBackupStatus(
     lastBackupTime: Long,
@@ -153,7 +153,7 @@ internal fun RemoteBackupStatus(
     }
 }
 
-// WebDAV / S3 页共用的外壳：可滚动的表单，底部悬浮着测试连接和立即备份
+// WebDAV 页的外壳：可滚动的表单，底部悬浮着测试连接和立即备份
 @Composable
 internal fun RemoteBackupLayout(
     isBackingUp: Boolean,

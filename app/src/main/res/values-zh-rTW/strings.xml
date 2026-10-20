@@ -163,14 +163,13 @@
   <string name="backup_page_delete_success">刪除成功</string>
   <string name="backup_page_export_desc">導出APP數據為檔案</string>
   <string name="backup_page_exporting">正在導出...</string>
+  <string name="backup_page_export_packing">正在打包 %1$d / %2$d</string>
+  <string name="backup_page_saving">正在儲存...</string>
   <string name="backup_page_files">檔案</string>
-  <string name="backup_page_import_chatbox_desc">匯入 ChatBox 提供者設定和完整聊天記錄</string>
-  <string name="backup_page_import_cherry_studio_desc">匯入 Cherry Studio 提供者設定</string>
   <string name="backup_page_import_desc">導入本地備份檔案</string>
+  <string name="backup_page_import_from_official">從 RikkaHub 匯入</string>
+  <string name="backup_page_import_official_desc">先在官方 RikkaHub 中匯出備份，再在此選擇該檔案</string>
   <string name="backup_page_import_export">本地</string>
-  <string name="backup_page_import_from_chatbox">從ChatBox導入</string>
-  <string name="backup_page_import_from_cherry_studio">從Cherry Studio導入</string>
-  <string name="backup_page_import_from_other_app">從其他APP導入</string>
   <string name="backup_page_importing">正在恢復...</string>
   <string name="backup_page_loading_failed">載入備份檔案失敗: %s</string>
   <string name="backup_page_local_backup_export">導出為檔案</string>
@@ -195,8 +194,6 @@
   <string name="backup_page_restore_success">恢復成功</string>
   <string name="backup_page_restoring">恢復中...</string>
   <string name="backup_page_s3_access_key_id">存取金鑰 ID</string>
-  <string name="backup_page_s3_backup">S3 備份</string>
-  <string name="backup_page_s3_backup_files">S3 備份檔案</string>
   <string name="backup_page_s3_bucket">Bucket</string>
   <string name="backup_page_s3_endpoint">端點</string>
   <string name="backup_page_s3_region">區域</string>
@@ -1213,7 +1210,7 @@
   <string name="video_player_error">無法播放此影片</string>
   <string name="video_player_open_with">使用其他應用程式開啟</string>
   <string name="setting_media_page_empty">尚無媒體生成供應商。點擊頂端的 + 即可新增。</string>
-  <string name="setting_media_page_s3_desc">部分 API 僅接受公開 URL 的素材（例如用於影片生成的參考圖片與參考影片）。在此設定 S3 相容的物件儲存服務後，本機檔案會先上傳至其儲存桶，再以臨時 URL 的形式傳遞給 API；上傳的檔案會在 7 天後自動清除。此設定與用於備份的 S3 相互獨立。</string>
+  <string name="setting_media_page_s3_desc">部分 API 僅接受公開 URL 的素材（例如用於影片生成的參考圖片與參考影片）。在此設定 S3 相容的物件儲存服務後，本機檔案會先上傳至其儲存桶，再以臨時 URL 的形式傳遞給 API；上傳的檔案會在 7 天後自動清除。</string>
   <string name="setting_media_page_provider_type">供應商類型</string>
   <string name="setting_media_page_provider_name">名稱</string>
   <string name="setting_media_page_workspace_id">Workspace ID</string>

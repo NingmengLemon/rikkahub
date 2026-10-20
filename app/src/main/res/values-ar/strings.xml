@@ -185,14 +185,13 @@
   <string name="backup_page_delete_success">تم الحذف بنجاح</string>
   <string name="backup_page_export_desc">تصدير بيانات التطبيق إلى ملف</string>
   <string name="backup_page_exporting">جارٍ التصدير...</string>
+  <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
+  <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">الملفات</string>
-  <string name="backup_page_import_chatbox_desc">استيراد إعدادات مزوّدي ChatBox وسجل المحادثة الكامل</string>
-  <string name="backup_page_import_cherry_studio_desc">استيراد إعدادات مزوّدي Cherry Studio</string>
   <string name="backup_page_import_desc">استيراد ملف نسخ احتياطي محلي</string>
+  <string name="backup_page_import_from_official">Import from RikkaHub</string>
+  <string name="backup_page_import_official_desc">Export a backup from the official RikkaHub first, then pick that file here</string>
   <string name="backup_page_import_export">محلي</string>
-  <string name="backup_page_import_from_chatbox">استيراد من ChatBox</string>
-  <string name="backup_page_import_from_cherry_studio">استيراد من Cherry Studio</string>
-  <string name="backup_page_import_from_other_app">استيراد من تطبيق آخر</string>
   <string name="backup_page_import_overwrite_confirm">سيؤدي استيراد نسخة احتياطية إلى الكتابة فوق بيانات التطبيق. هل تريد المتابعة؟</string>
   <string name="backup_page_importing">جارٍ الاستيراد...</string>
   <string name="backup_page_loading_failed">فشل تحميل ملفات النسخ الاحتياطي: %s</string>
@@ -218,8 +217,6 @@
   <string name="backup_page_restore_success">تمت الاستعادة بنجاح</string>
   <string name="backup_page_restoring">جارٍ الاستعادة...</string>
   <string name="backup_page_s3_access_key_id">معرّف مفتاح الوصول</string>
-  <string name="backup_page_s3_backup">النسخ الاحتياطي S3</string>
-  <string name="backup_page_s3_backup_files">ملفات النسخ الاحتياطي S3</string>
   <string name="backup_page_s3_bucket">الحاوية</string>
   <string name="backup_page_s3_endpoint">نقطة النهاية</string>
   <string name="backup_page_s3_path_style">نمط المسار</string>
@@ -1216,7 +1213,7 @@
   <string name="media_creation_error_cancelled_remotely">تم إلغاء المهمة على الخادم</string>
   <string name="media_creation_error_expired">انتهت صلاحية المهمة</string>
   <string name="setting_media_page_empty">لا يوجد مزوّدو توليد وسائط بعد. اضغط على + في الأعلى لإضافة مزوّد.</string>
-  <string name="setting_media_page_s3_desc">بعض واجهات API تقبل فقط الأصول الموجودة على روابط URL عامة (مثل الصور المرجعية ومقاطع الفيديو المرجعية لتوليد الفيديو). قم بإعداد خدمة تخزين كائنات متوافقة مع S3 هنا، حيث تُرفع الملفات المحلية إلى دلو الخدمة أولاً ثم تُمرَّر إلى API كروابط URL مؤقتة؛ وتُنظَّف الملفات المرفوعة تلقائيًا بعد 7 أيام. هذا الإعداد مستقل عن S3 المستخدم للنسخ الاحتياطية.</string>
+  <string name="setting_media_page_s3_desc">بعض واجهات API تقبل فقط الأصول الموجودة على روابط URL عامة (مثل الصور المرجعية ومقاطع الفيديو المرجعية لتوليد الفيديو). قم بإعداد خدمة تخزين كائنات متوافقة مع S3 هنا، حيث تُرفع الملفات المحلية إلى دلو الخدمة أولاً ثم تُمرَّر إلى API كروابط URL مؤقتة؛ وتُنظَّف الملفات المرفوعة تلقائيًا بعد 7 أيام.</string>
   <string name="setting_media_page_provider_type">نوع المزوّد</string>
   <string name="setting_media_page_provider_name">الاسم</string>
   <string name="setting_media_page_workspace_id">معرّف مساحة العمل</string>

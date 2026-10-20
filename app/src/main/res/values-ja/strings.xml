@@ -163,14 +163,13 @@
   <string name="backup_page_delete_success">削除成功</string>
   <string name="backup_page_export_desc">アプリデータをファイルにエクスポート</string>
   <string name="backup_page_exporting">エクスポート中...</string>
+  <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
+  <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">ファイル</string>
-  <string name="backup_page_import_chatbox_desc">ChatBoxプロバイダー設定と完全なチャット履歴をインポート</string>
-  <string name="backup_page_import_cherry_studio_desc">Cherry Studioプロバイダー設定をインポート</string>
   <string name="backup_page_import_desc">ローカルバックアップファイルをインポート</string>
+  <string name="backup_page_import_from_official">Import from RikkaHub</string>
+  <string name="backup_page_import_official_desc">Export a backup from the official RikkaHub first, then pick that file here</string>
   <string name="backup_page_import_export">ローカル</string>
-  <string name="backup_page_import_from_chatbox">ChatBoxからインポート</string>
-  <string name="backup_page_import_from_cherry_studio">Cherry Studioからインポート</string>
-  <string name="backup_page_import_from_other_app">他のアプリからインポート</string>
   <string name="backup_page_importing">インポート中...</string>
   <string name="backup_page_loading_failed">バックアップファイルの読み込み失敗: %s</string>
   <string name="backup_page_local_backup_export">ファイルにエクスポート</string>
@@ -195,8 +194,6 @@
   <string name="backup_page_restore_success">復元成功</string>
   <string name="backup_page_restoring">復元中...</string>
   <string name="backup_page_s3_access_key_id">アクセスキーID</string>
-  <string name="backup_page_s3_backup">S3バックアップ</string>
-  <string name="backup_page_s3_backup_files">S3バックアップファイル</string>
   <string name="backup_page_s3_bucket">バケット</string>
   <string name="backup_page_s3_endpoint">エンドポイント</string>
   <string name="backup_page_s3_region">リージョン</string>
@@ -1212,7 +1209,7 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="setting_media_page_edit_provider">プロバイダーを編集</string>
   <string name="setting_media_page_add_provider">プロバイダーを追加</string>
   <string name="setting_media_page_empty">メディア生成プロバイダーはまだありません。追加するには上部の + をタップしてください。</string>
-  <string name="setting_media_page_s3_desc">一部のAPIは、公開URL上のアセット（動画生成用の参照画像や参照動画など）しか受け付けません。ここでS3互換のオブジェクトストレージサービスを設定すると、ローカルファイルはまずそのバケットにアップロードされ、その後、一時URLとしてAPIに渡されます。アップロードされたファイルは7日後に自動的に削除されます。この設定は、バックアップに使用されるS3とは独立しています。</string>
+  <string name="setting_media_page_s3_desc">一部のAPIは、公開URL上のアセット（動画生成用の参照画像や参照動画など）しか受け付けません。ここでS3互換のオブジェクトストレージサービスを設定すると、ローカルファイルはまずそのバケットにアップロードされ、その後、一時URLとしてAPIに渡されます。アップロードされたファイルは7日後に自動的に削除されます。</string>
   <string name="setting_media_page_provider_type">プロバイダーの種類</string>
   <string name="setting_media_page_provider_name">名前</string>
   <string name="setting_media_page_workspace_id">ワークスペースID</string>

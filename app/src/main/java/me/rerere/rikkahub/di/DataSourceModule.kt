@@ -36,7 +36,6 @@ import me.rerere.rikkahub.data.remote.SettingsProxySelector
 import me.rerere.rikkahub.data.remote.SettingsSocks5Authenticator
 import me.rerere.rikkahub.data.remote.SponsorAPI
 import me.rerere.rikkahub.data.sync.BackupManager
-import me.rerere.rikkahub.data.sync.S3Sync
 import me.rerere.rikkahub.data.sync.webdav.WebDavSync
 import me.rerere.rikkahub.service.memoryDreamKeepAlive
 import me.rerere.search.SearchService
@@ -279,14 +278,6 @@ val dataSourceModule = module {
                 }
             }
         }
-    }
-
-    single {
-        S3Sync(
-            backupManager = get(),
-            context = get(),
-            httpClient = get()
-        )
     }
 
     single {
