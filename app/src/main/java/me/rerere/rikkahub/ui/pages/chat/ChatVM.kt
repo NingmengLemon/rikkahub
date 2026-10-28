@@ -13,7 +13,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -138,9 +137,6 @@ class ChatVM(
         chatService.finishEditQueuedMessage(_conversationId, id, parts)
 
     fun resumeMessageQueue() = chatService.resumeMessageQueue(_conversationId)
-
-    // 生成完成
-    val generationDoneFlow: SharedFlow<Uuid> = chatService.generationDoneFlow
 
     // MCP管理器
     val mcpManager = chatService.mcpManager

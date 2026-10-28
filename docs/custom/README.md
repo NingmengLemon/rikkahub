@@ -10,7 +10,8 @@
 | --- | --- |
 | `README.md` | 分支模型、同步流程、定制原则、定制清单、构建与测试环境 |
 | `roadmap.md` | 长期路线：阶段划分、易迁移目标、追更策略、分发与合规 |
-| `upstream/` | 单次上游同步的作业单，合并落地后删除；当前没有待办的作业单 |
+
+大的上游同步可以另建一份作业单放在 `upstream/`，合并落地后删除；当前没有作业单，所以那个目录不存在。
 
 ## 分支模型
 
@@ -47,8 +48,10 @@ git merge master
 
 ```powershell
 $env:JAVA_HOME='E:\WorkBench\Java\jdk-23.0.2'; $env:PATH="$env:JAVA_HOME\bin;$env:PATH"
-.\gradlew.bat test --continue --console=plain
+.\gradlew.bat :app:testGithubDebugUnitTest :ai:testDebugUnitTest --continue --console=plain
 ```
+
+`test` 任务也会跑，但 app 有 `github` 与 `play` 两个渠道，它会两套变体各跑一遍，没必要等。
 
 判据是「没有新增失败」，不是「全部通过」。Windows 上有固定的一批失败用例，见后文「测试环境噪声」一节，与代码无关。
 
@@ -130,7 +133,7 @@ git log --oneline master..custom
 
 两个口径会给出不同结论。C1 与 C2 按全历史属于动了最密集的两个文件，按近窗口则是中等热度。`60d016bb` 那次清理改到了 `ChatService.kt`，它是近期最热的文件之一，语音相关的清理集中在它身上，合并时按清单的「合并注意」列逐项复核。
 
-`GenerationLoop.kt` 已随上游 3.0.0 的重构删除，多步生成循环迁到 `ai/src/main/java/me/rerere/ai/agent/AgentLoop.kt`。后者在本次合并后才出现，改动 3 次，还没积累出热度。
+`GenerationLoop.kt` 已随上游 3.0.0 的重构删除，多步生成循环迁到 `ai/src/main/java/me/rerere/ai/agent/AgentLoop.kt`。后者随 3.1.0 的合并进来，此后上游每次改它都在累计热度，目前仍然偏低。
 
 上游另有两个长期未合并的重构分支 `refactor/chat-service`（停在 08-26）与 `refactor/ai-stream`（停在 08-12）。它们目前不构成冲突来源，但若上游重启这类重构，上述文件会整体重写，届时应暂停对热区的新定制。
 
@@ -152,14 +155,16 @@ git log --oneline master..custom
 | C10 | 新增从官方 RikkaHub 导入 | `ImportExportTab`（新增「从官方 RikkaHub 导入」分组与 `ImportSource.OFFICIAL`，与本地导入共用同一个确认对话框与 `openDocumentLauncher`）；7 个 locale 新增 `backup_page_import_from_official` 与 `backup_page_import_official_desc` | 改包名后本应用与官方应用并存，需要一个明确的迁移入口 | 官方备份与本应用的归档格式相同（`settings.json` + `rikka_hub.db` + 附件目录），所以复用同一条 `stageRestore` 流程，入口只负责引导用户先在官方应用里导出备份。`JsonInstant` 开了 `ignoreUnknownKeys`，官方备份里的额外字段不会导致解码失败 |
 | C11 | 导出备份显示进度 | `BackupManager.createBackup`（新增可选 `onProgress` 回调与 `BackupProgress`，附件先收集成列表再写入）；`WebDavSync.prepareBackupFile`（透传回调）；`BackupVM`（`exportProgress` 状态与 `finally` 清理）；`ImportExportTab`（打包阶段显示确定进度，写入目标文件阶段显示不确定进度）；7 个 locale 新增 `backup_page_export_packing` 与 `backup_page_saving` | 附件多时导出要等很久，没有进度不知道卡在哪一步 | 打包阶段按条目推进：`settings.json`、数据库快照、每个附件各算一条，`total` 与 `advance()` 的调用点一一对应。改为先收集附件再写入是为了给出确定的总数，代价是「列出」与「写入」之间文件消失的窗口从一个文件扩大到整个打包阶段；`PARTIAL_SUFFIX` 过滤与 `resolveInside` 校验都保留 |
 | C12 | 改包名与应用名 | `app/build.gradle.kts`（`applicationId` 改为 `top.lemoneko.rakkihub`）、`AndroidManifest.xml`（shortcut deep link 的 scheme 从 `rikkahub` 改为 `rakkihub`）、`res/xml/shortcuts.xml`（`android:data` 同步）、七处 `app_name` 改为 `RakkiHub`、`ExampleInstrumentedTest`（不再写死旧包名，改与 `BuildConfig.APPLICATION_ID` 比对） | 自主 fork 阶段要与官方应用并存，安装标识与私有数据目录必须独立 | `namespace` 保持 `me.rerere.rikkahub` 不动，类名、R 类与 `shortcuts.xml` 的 `targetClass` 都不受影响；`applicationIdSuffix = ".debug"` 保留，debug 包名是 `top.lemoneko.rakkihub.debug`；`${applicationId}` 拼的 authorities 与 `BuildConfig.APPLICATION_ID` 自动跟随。当时同步改过 `google-services.json` 的两个 package_name 与 CI 的 secret，C13 把 Firebase 整体移除后这两处都不再存在 |
-| C13 | 移除 Firebase 与 google-services | `app/build.gradle.kts`（两个 plugin alias、`firebase-bom` 与 `firebase-crashlytics` 依赖、冗余的 `barcode.scanning`）、根 `build.gradle.kts`（两个 plugin alias）、`libs.versions.toml`（firebase 三个版本、四个库定义、`google-services` 插件、`barcodeScanning`）、`AppModule.kt`（两处 import 与 `single { Firebase.crashlytics }` 绑定，这个绑定本来就没有消费者）、本地 `app/google-services.json`、`README.md`/`README_ZH_CN.md`/`README_ZH_TW.md`（删掉「需要 google-services.json 才能构建」的提示）、CI 的 `GOOGLE_SERVICES_JSON` secret 与 workflow 里的写入步骤；顺带为 `ImageUtils.kt` 补上显式的 `androidx.exifinterface` 依赖 | 不需要崩溃上报，也不想让应用依赖 Google 的运行时服务 | 代码与构建脚本里已无 `com.google.firebase` 的引用；checked-in 的 baseline profile 里还留着 firebase 与 crashlytics 的历史条目，下次重新生成会自愈。扫码在 3.1.1 由上游换成 CameraX 加 zxing，`quickie-bundled`、`barcode.scanning` 与 ML Kit 的传递依赖都不再存在；`androidx.exifinterface` 由上游在同一处显式声明，合并时删掉重复的那一行。上游若重新引入 Firebase，需要重新删除 |
+| C13 | 移除 Firebase 与 google-services | `app/build.gradle.kts`（两个 plugin alias、`firebase-bom` 与 `firebase-crashlytics` 依赖、冗余的 `barcode.scanning`）、根 `build.gradle.kts`（两个 plugin alias）、`libs.versions.toml`（firebase 三个版本、四个库定义、`google-services` 插件、`barcodeScanning`）、`AppModule.kt`（两处 import 与 `single { Firebase.crashlytics }` 绑定，这个绑定本来就没有消费者）、本地 `app/google-services.json`、`README.md`/`README_ZH_CN.md`/`README_ZH_TW.md`（删掉「需要 google-services.json 才能构建」的提示）、CI 的 `GOOGLE_SERVICES_JSON` secret 与 workflow 里的写入步骤；顺带为 `ImageUtils.kt` 补上显式的 `androidx.exifinterface` 依赖 | 不需要崩溃上报，也不想让应用依赖 Google 的运行时服务 | 代码与构建脚本里已无 `com.google.firebase` 的引用；checked-in 的 baseline profile（`app/src/main/generated/baselineProfiles/`）里还留着 firebase 与 crashlytics 的历史条目，也有 C1/C5 删掉的 MediaCreation、ImgGen 与 TTS 类，重新生成会自愈。扫码在 3.1.1 由上游换成 CameraX 加 zxing，`quickie-bundled`、`barcode.scanning` 与 ML Kit 的传递依赖都不再存在；`androidx.exifinterface` 由上游在同一处显式声明，合并时删掉重复的那一行。上游若重新引入 Firebase，需要重新删除 |
 | C14 | 移除设置页的分享本应用入口，统一品牌文案 | `SettingPage.kt`（about 分组里的分享 item、`shareText`/`share`/`noShareApp` 三个局部变量与三个失效 import）、7 个 locale 的 `setting_page_share`、`setting_page_share_desc`、`setting_page_share_text`、`setting_page_no_share_app`；品牌文案：`setting_page_web_server_desc`（7 个 locale）、`oauth` 模块的 4 条回调提示（7 个 locale）、`web-ui` 的 `page.json` 标题与描述、`conversation-sidebar.tsx` 的侧边栏标题 | 分享出去还自称官方品牌并指向上游官网，没有意义；其余文案跟着应用名一起改成 RakkiHub | `search-picker.tsx` 里的 `rikkahub: "RikkaHub"` 是搜索服务的显示名，指官方接口，保留；`backup_page_import_from_official` 的「Import from RikkaHub」指官方应用，同样保留 |
 
 ## 文案与 locale
 
-locale 现在有 8 份：`values`、`values-ar`、`values-de`、`values-ja`、`values-ko-rKR`、`values-ru`、`values-zh`、`values-zh-rTW`。德语是上游 3.1.1 加的，`app/build.gradle.kts` 的 `localeFilters` 已把这 8 个写死，再加语言要两处一起改。
+locale 现在有 8 份：`values`、`values-ar`、`values-de`、`values-ja`、`values-ko-rKR`、`values-ru`、`values-zh`、`values-zh-rTW`。德语是上游 3.1.1 加的。`app/build.gradle.kts` 的 `localeFilters` 列了 9 项：`en` 对应默认的 `values`，`ko` 与 `ko-rKR` 两项共用 `values-ko-rKR`，其余 6 项各对应一个目录。加语言时两处一起改。
 
 删除或新增文案时八份都要同步。合并上游之后，先按 `values/strings.xml` 的 key 集合过滤其余七份，因为上游会给已删除的 key 补翻译，德语尤其明显（本次合并多出 331 条）。过滤后的判据是：除 `values-zh` 外，每份只剩「上游新增但还没翻译」的缺口。
+
+品牌改写按 key 查不出来：C12 的 `app_name`、C14 的 `setting_page_web_server_desc` 与 `oauth` 的四条 `oauth_callback_*_hint`，在新增 locale 里会以官方品牌出现。合并后要逐条重放成 `RakkiHub`，判据是 `rg -n 'RikkaHub' app/src/main/res/values-* oauth/src/main/res/values-*` 只剩 `backup_page_import_from_official` 与 `backup_page_import_official_desc` 两处命中，它们指的就是官方应用，属于有意保留。
 
 下面清单里写「7 个 locale」的条目指的是做那项定制时仓库里的 7 份，德语是上游 3.1.1 才加的；同步这类改动时按当前的 8 份处理。
 

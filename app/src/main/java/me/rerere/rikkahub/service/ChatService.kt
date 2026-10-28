@@ -10,11 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
@@ -172,10 +169,6 @@ class ChatService(
     fun clearAllErrors() {
         _errors.value = emptyList()
     }
-
-    // 生成完成流
-    private val _generationDoneFlow = MutableSharedFlow<Uuid>()
-    val generationDoneFlow: SharedFlow<Uuid> = _generationDoneFlow.asSharedFlow()
 
     fun cleanup() = runCatching { sessionManager.cleanup() }
 
@@ -421,7 +414,6 @@ class ChatService(
                 // 开始补全
                 val result = if (queued.answer) runTurn(session) else null
 
-                _generationDoneFlow.emit(conversationId)
             } catch (e: Exception) {
                 e.printStackTrace()
                 reportFailure(session, e, R.string.error_title_send_message)
@@ -471,7 +463,6 @@ class ChatService(
                         runTurn(session, regenerateNodeId = node.id)
                     }
 
-                    _generationDoneFlow.emit(conversationId)
                 } catch (e: Exception) {
                     reportFailure(session, e, R.string.error_title_regenerate_message)
                 }
@@ -520,7 +511,6 @@ class ChatService(
                             runTurn(session)
                         }
 
-                        _generationDoneFlow.emit(conversationId)
                     }
                 } catch (e: Exception) {
                     reportFailure(session, e, R.string.error_title_tool_approval)
