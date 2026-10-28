@@ -10,7 +10,7 @@
 
 真正不可逆的那一步是改包名，因为它让新版本与旧版本成为两个应用，迁移只能靠备份导出导入。因此所有前置准备都在为它服务。
 
-当前处于阶段 0：继续按现有约束做定制，清单里尚未实施的项目等上游节奏放缓再做。阶段 1 的导入器是改包名与动数据层的前置，但它本身不依赖上游稳定性，可以随时开始。
+当前处于阶段 1：定制清单已全部落地，阶段 2.1 的改包名也已完成，剩下的是导入器与它带起的结构解冻。导入器不依赖上游稳定性，可以随时开始，但它决定之后所有数据层改动的安全边界，优先级高于其他候选。
 
 ## 阶段 1：易迁移
 
@@ -40,7 +40,7 @@ upload/ skills/ fonts/ media_creation/    附件，可选择不备份
 
 1. 独立只读层，不依赖 Room migration 链。
 
-   合并到 3.1.0 之后，custom 与官方发布版同为 v31（`Migration_30_31`）且 schema 一致，这条张力暂时不会出现。开始改结构之后就变了：`AppDatabaseFactory.create` 打开官方库，要么因为版本号更高而失败，要么在双方版本号相同、语义已经不同时静默读错。后者更危险，因为没有任何报错。
+   截至上游 3.1.1，custom 与官方发布版同为 v32（`Migration_31_32` 是自动迁移，`workspaces` 表加 `type` 与 `ssh_config`），且 schema 一致，这条张力暂时不会出现。开始改结构之后就变了：`AppDatabaseFactory.create` 打开官方库，要么因为版本号更高而失败，要么在双方版本号相同、语义已经不同时静默读错。后者更危险，因为没有任何报错。
 
    所以导入器不能用我们自己的 `@Entity` 定义去解析官方库，必须以裸 SQL 读出来，转成领域模型，再写进我们自己的库。
 
@@ -124,7 +124,7 @@ upload/ skills/ fonts/ media_creation/    附件，可选择不备份
 
 两个 secrets 缺一不可：`KEY_BASE64`（keystore）与 `SIGNING_CONFIG`（写进 `local.properties`）。C13 移除 Firebase 与 `google-services` 插件之后，`GOOGLE_SERVICES_JSON` 已不再需要。
 
-与本仓库的差异：不需要每晚发布 prerelease，不做发版，产物存为 workflow artifact 即可。
+本仓库沿用上游的 nightly prerelease：固定 tag `nightly`，每天覆盖同一个 Release，附带分 ABI 的 APK 与 `mapping.txt`。不做正式版本发布。
 
 ### 2.3 对数据层动手
 
@@ -147,7 +147,8 @@ upload/ skills/ fonts/ media_creation/    附件，可选择不备份
 | 模块 | 性质 | 策略 |
 | --- | --- | --- |
 | `ai/` | provider SDK、协议适配、模型注册表，与 UI 重构解耦 | 尽量跟随上游 |
-| `search/`、`document/`、`common/`、`highlight/` | 工具性质的独立模块 | 跟随上游 |
+| `search/`、`document/`、`common/` | 工具性质的独立模块 | 跟随上游 |
+| `terminal/` | 从 termux-app 收进来的终端模拟器核心，与 `workspace/` 配合支持本地与 SSH 终端 | 跟随上游 |
 | `workspace/` | 沙箱文件系统与 shell 执行环境 | 跟随上游 |
 | `web/` | Ktor 服务端与 web-ui 前端产物 | 跟随上游 |
 | `material3/`、`ui/` | 主题工具与不依赖 app 逻辑的 Compose 组件 | 跟随上游 |
@@ -162,7 +163,7 @@ upload/ skills/ fonts/ media_creation/    附件，可选择不备份
 
 取上游版本再重放这套做法只在整分支合并里成立。分层追更落地后不再整体 merge，`app/` 的处置变成：保命层改动手工摘，能力层评估后自己实现，地基层完全不动。两种做法以「是否还在整分支合并」为界，不混用。
 
-上游 3.0.0 把多步生成循环搬进了 `ai/` 模块，3.1.0 的合并已经把它整块带进来。这个划分是否成立可以检验：如果 `ai/` 真的变成了可以独立跟随的干净依赖，说明边界成立；如果没有，就需要重新划分。
+上游 3.0.0 把多步生成循环搬进了 `ai/` 模块，3.1.0 的合并已经把它整块带进来；3.1.1 又把工具执行计时和 models.dev 的模型能力数据放进 `ai/`。这个划分是否成立可以检验：如果 `ai/` 真的变成了可以独立跟随的干净依赖，说明边界成立；如果没有，就需要重新划分。
 
 ### 三层划分
 
@@ -180,7 +181,7 @@ upload/ skills/ fonts/ media_creation/    附件，可选择不备份
 
    ```powershell
    git log --oneline <上次同步点>..upstream/master -- `
-     ai/ common/ document/ highlight/ material3/ mediagen/ `
+     ai/ common/ document/ material3/ mediagen/ terminal/ `
      oauth/ search/ ui/ web/ workspace/
    ```
 
