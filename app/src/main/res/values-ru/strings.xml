@@ -596,8 +596,6 @@
   <string name="setting_display_page_show_thinking_content_title">Показывать содержание размышлений</string>
   <string name="setting_display_page_show_token_usage_desc">Отображать использование токенов и количество сообщений</string>
   <string name="setting_display_page_show_token_usage_title">Показывать статистику токенов и контекста</string>
-  <string name="setting_display_page_show_updates_desc">Отображать ли уведомления об обновлениях приложения</string>
-  <string name="setting_display_page_show_updates_title">Показывать обновления</string>
   <string name="setting_display_page_show_user_avatar_desc">Отображать аватар пользователя в сообщениях чата</string>
   <string name="setting_display_page_show_user_avatar_title">Показывать аватар пользователя</string>
   <string name="setting_display_page_skip_crop_image_desc">Пропустить обрезку после импорта изображений или съёмки</string>
@@ -919,11 +917,6 @@
   <string name="translator_page_title">Переводчик</string>
   <string name="translator_page_translate">Перевести</string>
   <string name="unpin_chat">Открепить чат</string>
-  <string name="update_card_check_failed">Проверка обновления не удалась</string>
-  <string name="update_card_close">Закрыть</string>
-  <string name="update_card_downloading">Идёт загрузка, следите за прогрессом в строке состояния</string>
-  <string name="update_card_new_version_found">Найдена новая версия %s</string>
-  <string name="update_card_unknown_error">Неизвестная ошибка</string>
   <string name="upload_file">Загрузить файл</string>
   <string name="use_web_search">Веб-поиск</string>
   <string name="user_default_name">Пользователь</string>
@@ -945,7 +938,7 @@
   <string name="setting_page_preferences_theme">Тема</string>
   <string name="setting_page_preferences_theme_desc">Динамические цвета, тема, тёмный режим AMOLED</string>
   <string name="setting_page_preferences_notification">Уведомления</string>
-  <string name="setting_page_preferences_notification_desc">Оповещения об обновлениях, уведомления о генерации сообщений, фоновое плавающее окно</string>
+  <string name="setting_page_preferences_notification_desc">Уведомления о генерации сообщений, фоновое плавающее окно</string>
   <string name="setting_page_preferences_general">Общие</string>
   <string name="setting_page_preferences_general_desc">Поведение взаимодействия, прокрутка, настройки ввода</string>
   <string name="setting_page_preferences_ui">Настройки интерфейса</string>
@@ -1102,12 +1095,6 @@
   <string name="search_picker_model_description">Облачный поиск, встроенный в провайдера моделей</string>
   <string name="search_picker_select_provider">Выберите провайдера поиска</string>
   <string name="search_picker_turn_off">Отключить поиск</string>
-  <string name="setting_update_reminder_enabled">Напоминания об обновлениях включены</string>
-  <string name="setting_update_reminder_paused_until">Приостановлено до %1$s</string>
-  <string name="setting_update_reminder_pause_title">Приостановить напоминания об обновлениях</string>
-  <string name="setting_update_reminder_pause_description">Выберите, как долго приостановить напоминания об обновлениях. Они возобновятся автоматически.</string>
-  <string name="setting_update_reminder_pause_days">%1$d дн.</string>
-  <string name="setting_update_reminder_resume_now">Возобновить сейчас</string>
   <string name="reasoning_max">Максимум</string>
   <string name="backup_page_import_overwrite_confirm">Импорт резервной копии перезапишет данные приложения. Продолжить?</string>
   <string name="setting_page_preferences_network">Сеть</string>

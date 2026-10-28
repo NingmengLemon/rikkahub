@@ -619,8 +619,6 @@
   <string name="setting_display_page_show_thinking_content_title">Show Thinking Content</string>
   <string name="setting_display_page_show_token_usage_desc">Display token usage and message count</string>
   <string name="setting_display_page_show_token_usage_title">Show Token &amp; Context Stats</string>
-  <string name="setting_display_page_show_updates_desc">Whether to display app update notifications</string>
-  <string name="setting_display_page_show_updates_title">Show Updates</string>
   <string name="setting_display_page_show_user_avatar_desc">Whether to display user avatar in chat messages</string>
   <string name="setting_display_page_show_user_avatar_title">Show User Avatar</string>
   <string name="setting_display_page_skip_crop_image_desc">Skip crop interface after importing images or taking photos</string>
@@ -732,7 +730,7 @@
   <string name="setting_page_preferences_theme">Theme</string>
   <string name="setting_page_preferences_theme_desc">Dynamic color, theme, AMOLED dark mode</string>
   <string name="setting_page_preferences_notification">Notifications</string>
-  <string name="setting_page_preferences_notification_desc">Update alerts, message generation notifications, background floating window</string>
+  <string name="setting_page_preferences_notification_desc">Message generation notifications, background floating window</string>
   <string name="setting_page_preferences_general">General</string>
   <string name="setting_page_preferences_general_desc">Interaction behavior, scrolling, input settings</string>
   <string name="setting_page_preferences_ui">UI Preferences</string>
@@ -969,11 +967,6 @@
   <string name="translator_page_title">Translator</string>
   <string name="translator_page_translate">Translate</string>
   <string name="unpin_chat">Unpin the Chat</string>
-  <string name="update_card_check_failed">Check update failed</string>
-  <string name="update_card_close">Close</string>
-  <string name="update_card_downloading">Downloading, please check status bar for progress</string>
-  <string name="update_card_new_version_found">New version found %s</string>
-  <string name="update_card_unknown_error">Unknown error</string>
   <string name="upload_file">Upload File</string>
   <string name="use_web_search">Web Search</string>
   <string name="user_default_name">User</string>
@@ -1126,12 +1119,6 @@
   <string name="assistant_page_context_message_limit_hint">Enter 0 for unlimited; otherwise, larger values are better. Setting it to 0 or at least 20 is recommended.</string>
   <string name="assistant_page_context_message_limit_too_small">The context message limit cannot be less than %1$d. It has been reset to %1$d.</string>
   <string name="assistant_page_context_message_limit_warning">Limiting context invalidates the prompt cache each time the context is trimmed. A larger limit trims less often; unlimited never trims and keeps the cache fully intact.</string>
-  <string name="setting_update_reminder_enabled">Update reminders are enabled</string>
-  <string name="setting_update_reminder_paused_until">Paused until %1$s</string>
-  <string name="setting_update_reminder_pause_title">Pause update reminders</string>
-  <string name="setting_update_reminder_pause_description">Choose how long to pause update reminders. They will resume automatically.</string>
-  <string name="setting_update_reminder_pause_days">%1$d days</string>
-  <string name="setting_update_reminder_resume_now">Resume now</string>
   <string name="backup_page_import_overwrite_confirm">Importing a backup will overwrite app data. Continue?</string>
   <string name="setting_provider_page_test_non_streaming">Non-streaming</string>
   <string name="setting_provider_page_test_streaming">Streaming</string>

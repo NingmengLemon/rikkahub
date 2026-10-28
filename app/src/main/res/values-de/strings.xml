@@ -580,7 +580,6 @@
   <string name="setting_display_page_enable_blur_effect_title">Weichzeichner-Effekt aktivieren</string>
   <string name="setting_display_page_enable_latex_rendering_desc">Stellt mathematische Ausdrücke und Formeln mit LaTeX-Syntax dar</string>
   <string name="setting_display_page_enable_latex_rendering_title">LaTeX-Darstellung aktivieren</string>
-  <string name="setting_display_page_show_updates_title">Updates anzeigen</string>
   <string name="setting_display_page_show_user_avatar_desc">Ob dein Avatar in Chat-Nachrichten angezeigt wird</string>
   <string name="setting_display_page_show_user_avatar_title">Benutzeravatar anzeigen</string>
   <string name="setting_display_page_skip_crop_image_desc">Überspringe die Zuschneideoberfläche nach dem Importieren oder Aufnehmen von Bildern</string>
@@ -611,7 +610,6 @@
   <string name="setting_display_page_show_thinking_content_title">Denkinhalt anzeigen</string>
   <string name="setting_display_page_show_token_usage_desc">Token-Nutzung und Nachrichtenanzahl anzeigen</string>
   <string name="setting_display_page_show_token_usage_title">Token- &amp; Kontext-Statistiken anzeigen</string>
-  <string name="setting_display_page_show_updates_desc">Ob App-Update-Benachrichtigungen angezeigt werden</string>
   <string name="setting_display_page_enable_message_generation_haptic_effect_desc">Haptisches Feedback aktivieren, während Nachrichten generiert werden</string>
   <string name="setting_display_page_enable_message_generation_haptic_effect_title">Haptisches Feedback bei der Nachrichtengenerierung</string>
   <string name="setting_display_page_font_size_preview">Um vier Uhr morgens sah ich, dass die Begonienblüten noch wach waren. Oft geht es mir so – allein in der stillen Nacht liege ich wach und denke: Wenn jetzt jemand an mich denkt, wäre das wunderbar.</string>
@@ -728,7 +726,7 @@
   <string name="setting_page_preferences_theme">Design</string>
   <string name="setting_page_preferences_theme_desc">Dynamische Farben, Design, AMOLED-Dunkelmodus</string>
   <string name="setting_page_preferences_notification">Benachrichtigungen</string>
-  <string name="setting_page_preferences_notification_desc">Update-Hinweise, Benachrichtigungen zur Nachrichtengenerierung, schwebendes Hintergrundfenster</string>
+  <string name="setting_page_preferences_notification_desc">Benachrichtigungen zur Nachrichtengenerierung, schwebendes Hintergrundfenster</string>
   <string name="setting_page_color_mode">Farbmodus</string>
   <string name="setting_page_color_mode_dark">Dunkel</string>
   <string name="setting_page_color_mode_light">Hell</string>
@@ -926,11 +924,6 @@
   <string name="translator_page_title">Übersetzer</string>
   <string name="translator_page_translate">Übersetzen</string>
   <string name="unpin_chat">Chat loslösen</string>
-  <string name="update_card_check_failed">Updateprüfung fehlgeschlagen</string>
-  <string name="update_card_close">Schließen</string>
-  <string name="update_card_downloading">Wird heruntergeladen, den Fortschritt findest du in der Statusleiste</string>
-  <string name="update_card_new_version_found">Neue Version gefunden: %s</string>
-  <string name="update_card_unknown_error">Unbekannter Fehler</string>
   <string name="upload_file">Datei hochladen</string>
   <string name="use_web_search">Websuche</string>
   <string name="user_default_name">Benutzer</string>
@@ -1083,10 +1076,6 @@
   <string name="assistant_page_context_message_limit_hint">Gib 0 für unbegrenzt ein; ansonsten sind größere Werte besser. Empfohlen sind 0 oder mindestens 20.</string>
   <string name="assistant_page_context_message_limit_too_small">Das Limit für Kontextnachrichten darf nicht kleiner als %1$d sein. Es wurde auf %1$d zurückgesetzt.</string>
   <string name="assistant_page_context_message_limit_warning">Eine Begrenzung des Kontexts macht den Prompt-Cache jedes Mal ungültig, wenn der Kontext gekürzt wird. Ein größeres Limit kürzt seltener; unbegrenzt kürzt nie und lässt den Cache vollständig intakt.</string>
-  <string name="setting_update_reminder_enabled">Update-Erinnerungen sind aktiviert</string>
-  <string name="setting_update_reminder_paused_until">Pausiert bis %1$s</string>
-  <string name="setting_update_reminder_pause_title">Update-Erinnerungen pausieren</string>
-  <string name="setting_update_reminder_pause_description">Wähle, wie lange die Update-Erinnerungen pausiert werden sollen. Sie werden automatisch fortgesetzt.</string>
   <string name="chat_generation_network_timeout">Zeitüberschreitung bei der Verbindung</string>
   <string name="chat_generation_network_unreachable">Verbindung zum Server nicht möglich</string>
   <string name="chat_generation_network_disconnected">Netzwerkverbindung verloren</string>
@@ -1102,8 +1091,6 @@
   <string name="chat_message_tool_calendar_create">Termin erstellen: %1$s</string>
   <string name="chat_page_move_to_folder">In Ordner verschieben</string>
   <string name="chat_page_remove_from_folder">Aus Ordner entfernen</string>
-  <string name="setting_update_reminder_pause_days">%1$d Tage</string>
-  <string name="setting_update_reminder_resume_now">Jetzt fortsetzen</string>
   <string name="backup_page_import_overwrite_confirm">Beim Importieren eines Backups werden die App-Daten überschrieben. Fortfahren?</string>
   <string name="setting_provider_page_test_non_streaming">Nicht-Streaming</string>
   <string name="setting_provider_page_test_streaming">Streaming</string>
