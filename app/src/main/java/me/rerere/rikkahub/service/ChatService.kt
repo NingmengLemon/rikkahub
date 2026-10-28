@@ -413,7 +413,6 @@ class ChatService(
 
                 // 开始补全
                 val result = if (queued.answer) runTurn(session) else null
-
             } catch (e: Exception) {
                 e.printStackTrace()
                 reportFailure(session, e, R.string.error_title_send_message)
@@ -462,7 +461,6 @@ class ChatService(
                     } else {
                         runTurn(session, regenerateNodeId = node.id)
                     }
-
                 } catch (e: Exception) {
                     reportFailure(session, e, R.string.error_title_regenerate_message)
                 }
@@ -510,7 +508,6 @@ class ChatService(
                         if (!updated.isAwaitingToolApproval) {
                             runTurn(session)
                         }
-
                     }
                 } catch (e: Exception) {
                     reportFailure(session, e, R.string.error_title_tool_approval)
