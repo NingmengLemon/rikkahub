@@ -1,9 +1,9 @@
 diff --git a/app/src/main/java/me/rerere/rikkahub/data/datastore/DefaultProviders.kt b/app/src/main/java/me/rerere/rikkahub/data/datastore/DefaultProviders.kt
-index 917ec982..39a23aa6 100644
+index 4581cd91..f94bf8b3 100644
 --- a/app/src/main/java/me/rerere/rikkahub/data/datastore/DefaultProviders.kt
 +++ b/app/src/main/java/me/rerere/rikkahub/data/datastore/DefaultProviders.kt
-@@ -17,6 +17,20 @@ import kotlin.uuid.Uuid
- val DEFAULT_AUTO_MODEL_ID = Uuid.parse("b7055fb4-39f9-4042-a88a-0d80ed76cf08")
+@@ -30,6 +30,20 @@ internal val REMOVED_SPONSOR_PROVIDER_IDS = setOf(
+ )
  
  val DEFAULT_PROVIDERS = listOf(
 +    // 仅用于生成 baseline profile，生成完必须撤掉（见 app/baselineprofile/mock-provider.patch）
