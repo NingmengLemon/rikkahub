@@ -78,7 +78,7 @@ internal class OfficialDatabaseReader private constructor(
                 for ((name, index) in indices) {
                     values[name] = if (cursor.isNull(index)) null else readValue(cursor, index, name, table)
                 }
-                yield(OfficialRow(values))
+                yield(OfficialRow(table.name, values))
             }
         } finally {
             cursor.close()
@@ -107,7 +107,7 @@ internal class OfficialDatabaseReader private constructor(
         private const val TAG = "OfficialDatabaseReader"
 
         fun open(databaseFile: File): OfficialDatabaseReader {
-            check(databaseFile.isFile) { "官方数据库不存在：${databaseFile.absolutePath}" }
+            require(databaseFile.isFile) { "官方数据库不存在：${databaseFile.absolutePath}" }
             val database = SQLiteDatabase.openDatabase(
                 databaseFile.absolutePath,
                 null,
@@ -127,10 +127,11 @@ internal class OfficialDatabaseReader private constructor(
 /**
  * 一行官方数据。
  *
- * 按 [OfficialDatabaseSchema.Column] 的 affinity 在读取时就转好类型，调用方拿到的是确定的
- * 类型；行对象不依赖 cursor，Sequence 结束之后仍然可读。
+ * 带表名与列值，值按 [OfficialDatabaseSchema.Column] 的 affinity 在读取时就转好类型，调用方
+ * 拿到的是确定的类型；行对象不依赖 cursor，Sequence 结束之后仍然可读。
  */
 internal class OfficialRow(
+    val tableName: String,
     private val values: Map<String, Any?>,
 ) {
     fun value(columnName: String): Any? = values[columnName]

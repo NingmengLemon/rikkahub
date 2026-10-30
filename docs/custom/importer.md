@@ -8,10 +8,11 @@
 
 导入器真正被需要，是在我们改动 Room schema 之后。在那之前实现它，没有真实场景可用，验收只能靠伪造样本（改掉 identity 或版本的官方备份），而伪造样本验证不了真实路径。反过来，改 schema 又要靠导入器保命，所以两者只能同一批做，顺序是导入器先落地并验证，再改结构。
 
-不依赖分叉的两项已经落地：
+不依赖分叉的部分陆续落地了：
 
 1. **附件目录替换**：见「附件替换」一节。
 2. **归档原始 zip**：见「归档」一节。
+3. **读取层**：见「读取层」一节。
 
 ## 现有的恢复流程
 
@@ -78,14 +79,12 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 
 这一节已经落地（C20）：`data/sync/official/OfficialDatabaseReader` 提供只读访问，打开时用 `PRAGMA table_info` 与 `user_version` 核对结构，结构与类型判断抽在 `OfficialSchemaVerifier` 里，不依赖 Android，可以直接跑 JVM 测试。
 
-`data/sync/official/OfficialDatabaseReader`。
-
 - `SQLiteDatabase.openDatabase(..., OPEN_READONLY)` 打开。不跑 integrity_check，那是 `DatabaseBackup.normalize` 的职责；导入器在解压后先调一次 `normalize` 把 `-wal` 合进去，再读。
 - 不加载 Room、不引用本仓库的 `@Entity`，表名列名全部来自 `OfficialDatabaseSchema`。
 - 只读业务表，`message_fts*` 跳过。
-- 逐行迭代，不 materialize：每张表产出 `Sequence<OfficialRow>`。`OfficialRow` 携带该表的 `Table` 元数据，列值按 affinity 转成确定的类型，不用裸 `Map`。读取时校验：快照里有、库里没有的列失败；类型与快照冲突失败；表缺失失败；库里多出来的列忽略并记日志。
+- 逐行迭代，不 materialize：每张表产出 `Sequence<OfficialRow>`。`OfficialRow` 携带表名与列值，列值按 affinity 在读取时转成确定的类型，行对象不依赖 cursor。读取时校验：快照里有、库里没有的列失败；类型与快照冲突失败；表缺失失败；库里多出来的列忽略并记日志。
 - 附件目录与嵌套规则引用 `OfficialBackupLayout`，不要在这里重列一遍。
-- 读取层只能在 androidTest 里验证，工程没有 JVM SQLite 或 Robolectric。
+- 读取层里碰 SQLite 的部分只能在 androidTest 里验证，工程没有 JVM SQLite 或 Robolectric；结构与类型的判断已经抽成纯函数，那部分跑 JVM 测试。
 
 ## 写入与字段映射
 

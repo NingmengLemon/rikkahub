@@ -65,6 +65,8 @@ class OfficialDatabaseReaderTest {
     fun failsWhenTheSnapshotTableIsMissing() {
         val file = rawDatabase("missing-table.db")
         SQLiteDatabase.openOrCreateDatabase(file, null).use { database ->
+            // 版本先于表检查，fixture 要把版本设对，否则命中的是版本分支
+            database.version = OfficialDatabaseSchema.VERSION
             database.execSQL("CREATE TABLE unrelated (id TEXT)")
         }
         val error = runCatching { OfficialDatabaseReader.open(file) }.exceptionOrNull()
@@ -76,6 +78,7 @@ class OfficialDatabaseReaderTest {
     fun failsWhenAColumnIsMissing() {
         val file = rawDatabase("missing-column.db")
         SQLiteDatabase.openOrCreateDatabase(file, null).use { database ->
+            database.version = OfficialDatabaseSchema.VERSION
             // 只建一张缺列的 ConversationEntity，遍历顺序里它排在第一位，所以命中的是缺列分支
             database.execSQL("CREATE TABLE ConversationEntity (id TEXT PRIMARY KEY)")
         }
