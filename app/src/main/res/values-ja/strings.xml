@@ -167,12 +167,12 @@
   <string name="backup_page_export_official_desc">公式 RikkaHub で復元できるバックアップを作成します</string>
   <string name="backup_page_export_failed">エクスポートに失敗しました</string>
   <string name="backup_page_export_schema_diverged">公式 RikkaHub 互換のバックアップを作成できません。このアプリのデータ構造が変更されています。通常のエクスポートを使用してください</string>
-  <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
-  <string name="backup_page_saving">Saving...</string>
+  <string name="backup_page_export_packing">%1$d / %2$d を梱包中</string>
+  <string name="backup_page_saving">保存中...</string>
   <string name="backup_page_files">ファイル</string>
   <string name="backup_page_import_desc">ローカルバックアップファイルをインポート</string>
-  <string name="backup_page_import_from_official">Import from RikkaHub</string>
-  <string name="backup_page_import_official_desc">Export a backup from the official RikkaHub first, then pick that file here</string>
+  <string name="backup_page_import_from_official">RikkaHub からインポート</string>
+  <string name="backup_page_import_official_desc">先に公式 RikkaHub でバックアップをエクスポートし、そのファイルをここで選択してください</string>
   <string name="backup_page_import_export">ローカル</string>
   <string name="backup_page_importing">インポート中...</string>
   <string name="backup_page_loading_failed">バックアップファイルの読み込み失敗: %s</string>

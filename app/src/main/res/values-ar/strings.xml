@@ -189,12 +189,12 @@
   <string name="backup_page_export_official_desc">إنشاء نسخة احتياطية يمكن لتطبيق RikkaHub الرسمي استعادتها</string>
   <string name="backup_page_export_failed">فشل التصدير</string>
   <string name="backup_page_export_schema_diverged">تعذر إنشاء نسخة متوافقة مع RikkaHub الرسمي: تغيّر هيكل بيانات هذا التطبيق. استخدم التصدير العادي بدلاً من ذلك</string>
-  <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
-  <string name="backup_page_saving">Saving...</string>
+  <string name="backup_page_export_packing">جارٍ التجميع %1$d / %2$d</string>
+  <string name="backup_page_saving">جارٍ الحفظ...</string>
   <string name="backup_page_files">الملفات</string>
   <string name="backup_page_import_desc">استيراد ملف نسخ احتياطي محلي</string>
-  <string name="backup_page_import_from_official">Import from RikkaHub</string>
-  <string name="backup_page_import_official_desc">Export a backup from the official RikkaHub first, then pick that file here</string>
+  <string name="backup_page_import_from_official">استيراد من RikkaHub</string>
+  <string name="backup_page_import_official_desc">صدّر نسخة احتياطية من تطبيق RikkaHub الرسمي أولاً، ثم اختر هذا الملف هنا</string>
   <string name="backup_page_import_export">محلي</string>
   <string name="backup_page_import_overwrite_confirm">سيؤدي استيراد نسخة احتياطية إلى الكتابة فوق بيانات التطبيق. هل تريد المتابعة؟</string>
   <string name="backup_page_importing">جارٍ الاستيراد...</string>

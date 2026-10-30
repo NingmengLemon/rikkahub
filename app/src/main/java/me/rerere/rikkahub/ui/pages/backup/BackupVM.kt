@@ -88,8 +88,8 @@ class BackupVM(
      * 返回后置为 null，调用方据此切换到"写入目标文件"的阶段。
      *
      * [target] 决定产出给谁读：自家备份带全量数据，官方兼容备份要交给官方客户端。
-     * 双方 schema 一致时两者产物相同，分叉后官方出口会直接失败。
-     * 只有自家备份算一次完整备份，官方兼容的那份不算，不更新备份提醒的时间戳。
+     * 现在双方 schema 一致，两份产物相同；分叉后官方出口会直接失败。
+     * 只有自家备份更新备份提醒的时间戳，官方兼容那份是用来交还数据的，不计入提醒。
      */
     suspend fun exportToFile(target: BackupTarget): File {
         _exportProgress.value = BackupProgress(done = 0, total = 0)

@@ -44,7 +44,7 @@ internal object OfficialDatabaseAdapter {
                 if (cursor.moveToFirst()) cursor.getInt(0) else 0
             }
             // room_master_table 是 Room 自己维护的单行表，更早的库没有它。先查 sqlite_master
-            // 而不是靠捕获异常：后者会把锁冲突、打不开、权限这类真正的问题也当成「身份未知」。
+            // 而不是靠捕获异常：后者会把 SELECT 期间的锁冲突之类真正的问题也当成「身份未知」。
             val identityHash = if (hasRoomMasterTable(database)) {
                 database.rawQuery("SELECT identity_hash FROM room_master_table LIMIT 1", null)
                     .use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
