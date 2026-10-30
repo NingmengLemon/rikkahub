@@ -42,8 +42,11 @@ class BackupManagerTest {
             override fun getFilesDir() = File(directory, "files").apply { mkdirs() }
             override fun getCacheDir() = File(directory, "cache").apply { mkdirs() }
             override fun getNoBackupFilesDir() = File(directory, "no-backup").apply { mkdirs() }
-            override fun getDatabasePath(name: String): File = if (File(name).isAbsolute) File(name)
-                else File(directory, "databases/$name").also { it.parentFile!!.mkdirs() }
+            override fun getDatabasePath(name: String): File = if (File(name).isAbsolute) {
+                File(name)
+            } else {
+                File(directory, "databases/$name").also { it.parentFile!!.mkdirs() }
+            }
         }
         liveDatabase = AppDatabaseFactory.create(context)
         liveDatabase.openHelper.writableDatabase.execSQL("CREATE TABLE backup_probe (text TEXT)")
@@ -98,6 +101,26 @@ class BackupManagerTest {
         assertEquals("live", probe(liveDatabase))
     }
 
+    /**
+     * 官方兼容出口的核心安全属性：双方 schema 一致时原样产出，分叉时直接失败。
+     *
+     * 现在本仓库的 schema 与官方 v32 一致，所以这里只能验证「一致时能产出、且产出的库
+     * 与自家备份读得到同样的内容」。分叉分支由 `OfficialDatabaseCompatibilityTest` 覆盖。
+     */
+    @Test fun officialTargetProducesRestorableArchiveWhileSchemasMatch() = runBlocking {
+        val archive = manager.createBackup(
+            includeDatabase = true,
+            includeFiles = false,
+            backupTarget = BackupTarget.OFFICIAL,
+        )
+        ZipFile(archive).use { zip ->
+            assertTrue(zip.getEntry("settings.json") != null)
+            assertTrue(zip.getEntry(DatabaseBackup.ARCHIVE_DATABASE) != null)
+        }
+        manager.stageRestore(archive, includeDatabase = true, includeFiles = false)
+        assertEquals("live", probe(liveDatabase))
+    }
+
     @Test fun launchCountStaysInSettingsJsonThroughBackupAndStaging() = runBlocking {
         val archive = manager.createBackup(includeDatabase = false, includeFiles = false)
         val archived = ZipFile(archive).use { zip ->
@@ -117,7 +140,11 @@ class BackupManagerTest {
         val archive = File(directory, "no-launch-count.zip")
         ZipOutputStream(archive.outputStream()).use { zip ->
             zip.putNextEntry(ZipEntry("settings.json"))
-            zip.write(JsonObject(JsonInstant.parseToJsonElement(settingsJson).jsonObject - "launchCount").toString().toByteArray())
+            zip.write(
+                JsonObject(
+                    JsonInstant.parseToJsonElement(settingsJson).jsonObject - "launchCount"
+                ).toString().toByteArray()
+            )
             zip.closeEntry()
         }
         manager.stageRestore(archive, includeDatabase = false, includeFiles = false)
@@ -171,7 +198,10 @@ class BackupManagerTest {
     }
 
     private fun probe(database: AppDatabase): String = database.openHelper.readableDatabase
-        .query("SELECT text FROM backup_probe").use { check(it.moveToFirst()); it.getString(0) }
+        .query("SELECT text FROM backup_probe").use {
+            check(it.moveToFirst())
+            it.getString(0)
+        }
 
     private fun addFile(zip: ZipOutputStream, name: String, file: File) {
         zip.putNextEntry(ZipEntry(name))

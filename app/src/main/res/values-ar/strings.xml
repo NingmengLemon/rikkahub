@@ -187,6 +187,8 @@
   <string name="backup_page_exporting">جارٍ التصدير...</string>
   <string name="backup_page_export_official">تصدير إلى RikkaHub</string>
   <string name="backup_page_export_official_desc">إنشاء نسخة احتياطية يمكن لتطبيق RikkaHub الرسمي استعادتها</string>
+  <string name="backup_page_export_failed">فشل التصدير</string>
+  <string name="backup_page_export_schema_diverged">تعذر إنشاء نسخة متوافقة مع RikkaHub الرسمي: تغيّر هيكل بيانات هذا التطبيق. استخدم التصدير العادي بدلاً من ذلك</string>
   <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
   <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">الملفات</string>

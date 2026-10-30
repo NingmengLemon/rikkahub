@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +32,7 @@ import me.rerere.hugeicons.stroke.FileImport
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.WebDavConfig
 import me.rerere.rikkahub.data.sync.BackupTarget
+import me.rerere.rikkahub.data.sync.official.OfficialExportUnsupportedException
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.pages.backup.BackupVM
@@ -56,9 +58,10 @@ fun ImportExportTab(
     val context = LocalContext.current
     val selectedBackupItems by vm.localBackupItems.collectAsStateWithLifecycle()
     val exportProgress by vm.exportProgress.collectAsStateWithLifecycle()
-    var isExporting by remember { mutableStateOf(false) }
-    // 两个导出入口共用同一个保存文件的 launcher，点击时先记住本次要产出给谁
-    var pendingExportTarget by remember { mutableStateOf(BackupTarget.SELF) }
+    // picker 打开期间可能转屏或进程被回收，目标要能跨重建保存，否则官方入口会退回自家格式
+    var pendingExportTarget by rememberSaveable { mutableStateOf(BackupTarget.SELF) }
+    var exportingTarget by remember { mutableStateOf<BackupTarget?>(null) }
+    val isExporting = exportingTarget != null
     var isRestoring by remember { mutableStateOf(false) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
     var importSource by remember { mutableStateOf(ImportSource.LOCAL) }
@@ -69,10 +72,12 @@ fun ImportExportTab(
     ) { uri ->
         uri?.let { targetUri ->
             scope.launch {
-                isExporting = true
+                // 在进入协程时固定下来，之后即使用户再点另一个入口也不会串
+                val target = pendingExportTarget
+                exportingTarget = target
                 runCatching {
                     // 打包成临时文件，期间 exportProgress 给出打包进度
-                    val exportFile = vm.exportToFile(pendingExportTarget)
+                    val exportFile = vm.exportToFile(target)
 
                     // 复制到用户选择的位置，这一段按字节走，没有逐项进度
                     context.contentResolver.openOutputStream(targetUri)?.use { outputStream ->
@@ -90,12 +95,16 @@ fun ImportExportTab(
                     )
                 }.onFailure { e ->
                     e.printStackTrace()
-                    toaster.show(
-                        context.getString(R.string.backup_page_restore_failed, e.message ?: ""),
-                        type = ToastType.Error
-                    )
+                    // 目标文档在选择位置时就已经建出来了，失败时删掉，别留一个 0 字节的 zip
+                    runCatching { context.contentResolver.delete(targetUri, null, null) }
+                    val message = if (e is OfficialExportUnsupportedException) {
+                        context.getString(R.string.backup_page_export_schema_diverged)
+                    } else {
+                        context.getString(R.string.backup_page_export_failed)
+                    }
+                    toaster.show(message, type = ToastType.Error)
                 }
-                isExporting = false
+                exportingTarget = null
             }
         }
     }
@@ -171,14 +180,16 @@ fun ImportExportTab(
                 headlineContent = { Text(stringResource(R.string.backup_page_local_backup_export)) },
                 supportingContent = {
                     Text(
-                        if (isExporting) {
+                        if (exportingTarget == BackupTarget.SELF) {
                             stringResource(R.string.backup_page_exporting)
                         } else {
                             stringResource(R.string.backup_page_export_desc)
                         }
                     )
                 },
-                leadingContent = { BackupActionIcon(HugeIcons.FileExport, loading = isExporting) },
+                leadingContent = {
+                    BackupActionIcon(HugeIcons.FileExport, loading = exportingTarget == BackupTarget.SELF)
+                },
             )
 
             // 第二个出口：产出官方客户端读得回去的备份。双方 schema 一致时它与上面那份几乎一样，
@@ -195,14 +206,16 @@ fun ImportExportTab(
                 headlineContent = { Text(stringResource(R.string.backup_page_export_official)) },
                 supportingContent = {
                     Text(
-                        if (isExporting) {
+                        if (exportingTarget == BackupTarget.OFFICIAL) {
                             stringResource(R.string.backup_page_exporting)
                         } else {
                             stringResource(R.string.backup_page_export_official_desc)
                         }
                     )
                 },
-                leadingContent = { BackupActionIcon(HugeIcons.FileExport, loading = isExporting) },
+                leadingContent = {
+                    BackupActionIcon(HugeIcons.FileExport, loading = exportingTarget == BackupTarget.OFFICIAL)
+                },
             )
 
             // 打包时按条目推进，打包结束后是写入目标文件的阶段，没有可数的进度

@@ -88,8 +88,9 @@ class BackupVM(
      * 返回后置为 null，调用方据此切换到"写入目标文件"的阶段。
      *
      * [target] 决定产出给谁读：自家备份带全量数据，官方兼容备份按官方 schema 裁剪。
+     * 只有自家备份算一次完整备份，官方兼容的那份可能被裁过，不更新备份提醒的时间戳。
      */
-    suspend fun exportToFile(target: BackupTarget = BackupTarget.SELF): File {
+    suspend fun exportToFile(target: BackupTarget): File {
         _exportProgress.value = BackupProgress(done = 0, total = 0)
         try {
             val file = webDavSync.prepareBackupFile(
@@ -97,7 +98,7 @@ class BackupVM(
                 target = target,
                 onProgress = { _exportProgress.value = it },
             )
-            recordBackupTime()
+            if (target == BackupTarget.SELF) recordBackupTime()
             return file
         } finally {
             _exportProgress.value = null

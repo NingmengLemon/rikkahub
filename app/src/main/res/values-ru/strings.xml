@@ -165,6 +165,8 @@
   <string name="backup_page_exporting">Экспорт…</string>
   <string name="backup_page_export_official">Экспорт для RikkaHub</string>
   <string name="backup_page_export_official_desc">Создать резервную копию, которую сможет восстановить официальный RikkaHub</string>
+  <string name="backup_page_export_failed">Не удалось экспортировать</string>
+  <string name="backup_page_export_schema_diverged">Невозможно создать резервную копию, совместимую с официальным RikkaHub: структура данных этого приложения изменилась. Используйте обычный экспорт</string>
   <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
   <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">Файлы</string>

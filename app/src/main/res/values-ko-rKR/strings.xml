@@ -165,6 +165,8 @@
   <string name="backup_page_exporting">내보내는 중...</string>
   <string name="backup_page_export_official">RikkaHub용으로 내보내기</string>
   <string name="backup_page_export_official_desc">공식 RikkaHub에서 복원할 수 있는 백업을 만듭니다</string>
+  <string name="backup_page_export_failed">내보내기 실패</string>
+  <string name="backup_page_export_schema_diverged">공식 RikkaHub 호환 백업을 만들 수 없습니다. 이 앱의 데이터 구조가 변경되었습니다. 일반 내보내기를 사용하세요</string>
   <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
   <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">파일</string>

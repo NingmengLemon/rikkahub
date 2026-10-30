@@ -165,6 +165,8 @@
   <string name="backup_page_exporting">エクスポート中...</string>
   <string name="backup_page_export_official">RikkaHub 向けにエクスポート</string>
   <string name="backup_page_export_official_desc">公式 RikkaHub で復元できるバックアップを作成します</string>
+  <string name="backup_page_export_failed">エクスポートに失敗しました</string>
+  <string name="backup_page_export_schema_diverged">公式 RikkaHub 互換のバックアップを作成できません。このアプリのデータ構造が変更されています。通常のエクスポートを使用してください</string>
   <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
   <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">ファイル</string>

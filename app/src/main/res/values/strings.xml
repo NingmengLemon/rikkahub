@@ -165,6 +165,8 @@
   <string name="backup_page_exporting">Exporting...</string>
   <string name="backup_page_export_official">Export for RikkaHub</string>
   <string name="backup_page_export_official_desc">Write a backup the official RikkaHub can restore</string>
+  <string name="backup_page_export_failed">Export failed</string>
+  <string name="backup_page_export_schema_diverged">Unable to write an official-compatible backup: this build has changed its database shape. Use the normal export instead</string>
   <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
   <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">Files</string>

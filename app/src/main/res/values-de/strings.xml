@@ -105,6 +105,8 @@
   <string name="backup_page_exporting">Exportieren...</string>
   <string name="backup_page_export_official">Für RikkaHub exportieren</string>
   <string name="backup_page_export_official_desc">Ein Backup schreiben, das das offizielle RikkaHub wiederherstellen kann</string>
+  <string name="backup_page_export_failed">Export fehlgeschlagen</string>
+  <string name="backup_page_export_schema_diverged">Ein RikkaHub-kompatibles Backup ist nicht möglich: Der Datenaufbau dieser App hat sich geändert. Nutze stattdessen den normalen Export</string>
   <string name="backup_page_files">Dateien</string>
   <string name="backup_page_export_packing">Packe %1$d / %2$d</string>
   <string name="backup_page_saving">Wird gespeichert...</string>

@@ -32,7 +32,8 @@ class WebDavSync(
     }
 
     suspend fun backup(config: WebDavConfig) = withContext(Dispatchers.IO) {
-        val file = prepareBackupFile(config)
+        // WebDAV 出口目前只产出自家格式；官方兼容出口暂时只放在本地导出里
+        val file = prepareBackupFile(config, BackupTarget.SELF)
         val client = getClient(config)
 
         // Ensure the backup directory exists
@@ -106,12 +107,12 @@ class WebDavSync(
 
     suspend fun prepareBackupFile(
         config: WebDavConfig,
-        target: BackupTarget = BackupTarget.SELF,
+        target: BackupTarget,
         onProgress: ((BackupProgress) -> Unit)? = null,
     ): File = backupManager.createBackup(
         includeDatabase = WebDavConfig.BackupItem.DATABASE in config.items,
         includeFiles = WebDavConfig.BackupItem.FILES in config.items,
-        target = target,
+        backupTarget = target,
         onProgress = onProgress,
     )
 

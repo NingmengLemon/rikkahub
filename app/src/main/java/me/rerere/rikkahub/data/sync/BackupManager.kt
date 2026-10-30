@@ -51,7 +51,7 @@ class BackupManager(
     suspend fun createBackup(
         includeDatabase: Boolean,
         includeFiles: Boolean,
-        target: BackupTarget = BackupTarget.SELF,
+        backupTarget: BackupTarget = BackupTarget.SELF,
         onProgress: ((BackupProgress) -> Unit)? = null,
     ): File = withContext(Dispatchers.IO) {
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
@@ -77,7 +77,7 @@ class BackupManager(
                 if (includeDatabase) {
                     val snapshot = File(staging, SQLiteConfiguration.DATABASE_NAME)
                     DatabaseBackup.createSnapshot(database.openHelper.writableDatabase, snapshot)
-                    val databaseEntry = when (target) {
+                    val databaseEntry = when (backupTarget) {
                         BackupTarget.SELF -> snapshot
                         BackupTarget.OFFICIAL -> OfficialDatabaseAdapter.adaptForOfficial(snapshot)
                     }
