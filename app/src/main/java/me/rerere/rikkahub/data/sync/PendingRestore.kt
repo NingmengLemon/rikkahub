@@ -110,7 +110,8 @@ internal class PendingRestore(
     /**
      * 归档里的附件目录按替换语义处理：live 目录里多出来、payload 里没有的文件要删掉。
      *
-     * 只针对归档里实际带了的目录。备份可以只带数据库，那种情况不会走到这里，见 [buildEntries]。
+     * 只针对归档里实际带了的目录。只带数据库的备份会得到空列表，什么都不删；[buildEntries]
+     * 也只在 payload 同时带数据库时才调用这里。
      * 删除用 `install = false` 的条目表达，journal 与 rollback 原样复用：apply 会把目标移进
      * `originals/`，rollback 再移回来。做成文件级条目而不是目录级 rename，是因为 journal 与
      * rollback 都按路径记录单个文件，目录条目得为它们另加一套状态。

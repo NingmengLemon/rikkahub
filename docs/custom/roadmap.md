@@ -68,7 +68,7 @@ upload/ skills/ fonts/ media_creation/    附件，可选择不备份
 
    把官方产出的原始备份文件另存一份，永不删除。它本来就是官方自己产出的自包含文件，随时能被官方客户端吃回去。归档负责保命，转换器负责搬家，两者解耦之后改数据的胆子可以大很多。
 
-   归档做在本地导入与 WebDAV 导入共用的 `restoreFromBackupFile` 里，在恢复成功之后执行，不依赖导入器是否已经实现，放 `noBackupFilesDir` 而不是 `filesDir`（后者整个目录被 web 路由暴露）。失败的恢复没有改动任何数据，不需要留底。
+   归档做在本地导入与 WebDAV 导入共用的 `restoreFromBackupFile` 里，在 `stageRestore` 成功之后执行，不依赖导入器是否已经实现，放 `noBackupFilesDir` 而不是 `filesDir`（后者整个目录被 web 路由暴露）。失败的恢复没有改动任何数据，不需要留底。
 
 5. `settings.json` 比数据库更麻烦，要单独设计。
 

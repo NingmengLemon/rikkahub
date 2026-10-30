@@ -29,11 +29,11 @@ class PendingRestoreTest {
         return file
     }
 
-    private fun stage(restore: PendingRestore): File = restore.createStagingDirectory().also {
+    private fun stage(subject: PendingRestore): File = subject.createStagingDirectory().also {
         write(File(it, "payload/database/rikka_hub"), "new database")
         write(File(it, "payload/files/upload/photo"), "new photo")
         write(File(it, "settings.json"), "new settings")
-        restore.publish(it)
+        subject.publish(it)
     }
 
     @Test fun publishingDoesNotTouchLiveFiles() {

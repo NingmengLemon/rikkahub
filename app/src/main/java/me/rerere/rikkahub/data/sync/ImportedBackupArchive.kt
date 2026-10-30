@@ -11,7 +11,7 @@ import java.time.format.DateTimeFormatter
  * 导入成功的原始备份留底。
  *
  * 它是官方自己产出的自包含文件，随时能被官方吃回去，也是导入写坏数据时唯一能回退的东西。
- * 只在恢复成功之后调用：失败的归档不修改任何数据，不需要为它留底，留着只会堆积。
+ * 只在恢复成功之后调用：失败的恢复没有改动任何数据，不需要为它留底，留着只会堆积。
  */
 internal object ImportedBackupArchive {
     private val stamp = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS")
@@ -21,14 +21,20 @@ internal object ImportedBackupArchive {
      *
      * 先写临时文件再原子改名，进程中途被杀不会留下截断的归档；文件名带毫秒，同一秒内多次
      * 导入不会互相覆盖。不覆盖已有文件：宁可多出一份，也不要悄悄替换掉上一份。
+     * 失败时会把临时文件删掉，不在目录里留残渣。
      */
     fun store(source: File, directory: File): Result<File> = runCatching {
         check(directory.isDirectory || directory.mkdirs()) { "Cannot create archive directory" }
         val target = File(directory, "imported_${stamp.format(LocalDateTime.now())}.zip")
         check(!target.exists()) { "Imported backup archive already exists: ${target.name}" }
         val temporary = File(directory, target.name + ".tmp")
-        Files.copy(source.toPath(), temporary.toPath(), REPLACE_EXISTING)
-        Files.move(temporary.toPath(), target.toPath(), ATOMIC_MOVE)
+        try {
+            Files.copy(source.toPath(), temporary.toPath(), REPLACE_EXISTING)
+            Files.move(temporary.toPath(), target.toPath(), ATOMIC_MOVE)
+        } catch (e: Exception) {
+            temporary.delete()
+            throw e
+        }
         target
     }
 }

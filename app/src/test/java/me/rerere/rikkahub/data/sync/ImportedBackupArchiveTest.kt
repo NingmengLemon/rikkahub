@@ -40,6 +40,6 @@ class ImportedBackupArchiveTest {
         val directory = File(temporary.root, "imported-backups")
         val result = ImportedBackupArchive.store(File(temporary.root, "absent.zip"), directory)
         assertTrue(result.isFailure)
-        assertNotNull(result.exceptionOrNull())
+        assertTrue(result.exceptionOrNull() is java.nio.file.NoSuchFileException)
     }
 }

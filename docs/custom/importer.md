@@ -168,22 +168,22 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 
 ## 分步计划
 
-导入器本体（延后到分叉之后）：
+导入器本体。它与第一次改 schema 同一批做，顺序是导入器先落地并验证，再动结构：
 
 1. 读取层：先定 fixture 与期望值（行数、列集合、内容 hash，由独立脚本算出），再写 reader，用 androidTest 跑。
 2. 版本判定与分流：接到 `restoreFromBackupFile`。
 3. 写入：行数据 → 新建 Room 库 → 校验能打开且各表 hash 与期望值一致。
-4. settings 校验、附件、归档。
+4. settings 形状校验。附件替换与归档已经在共用入口落地，导入器分支复用它们，不再做一遍。
 5. 验收。
 
 现在先做的两项不依赖上面任何一步，都已经落地：
 
-1. **归档**：`ImportedBackupArchive.store` 加 `ImportedBackupArchiveTest`（JVM，四条：落盘内容、不覆盖旧档、不留临时文件、源缺失返回 null）。
+1. **归档**：`ImportedBackupArchive.store` 加 `ImportedBackupArchiveTest`（JVM，四条：落盘内容、不覆盖旧档、不留临时文件、源缺失时返回带原因的失败）。
 2. **附件替换**：`PendingRestore.buildRemovalEntries` 加 `PendingRestoreTest` 的新用例（JVM，覆盖「多余附件被删」「只导数据库时 live 附件不动」「只导附件时 live 附件不动」「嵌套的 skills 目录被递归替换」「rollback 恢复被删文件，且断言删除确实发生过」）。
 
 ## 已知限制
 
-- 导入是替换语义，不与现有数据合并。
+- 数据库被替换时，导入是替换语义，不与现有数据合并。
 - 附件替换只在 payload 同时带数据库时发生。只导附件的恢复是叠加：现有库还在引用 live 上的文件，删掉它们等于制造悬空引用。
 - 归档里「存在但为空」的附件目录无法表达：写归档的侧不写目录条目，读归档的侧也会跳过目录条目，所以空目录与「没有这个目录」在 payload 里长得一样，替换时会退化成合并。`skills/` 被清空后留下的空目录会被 `SkillManager` 当成待清理目录。
 - `upload/` 与 `fonts/` 在导出侧只收顶层文件，替换侧却是递归删除。payload 同时带数据库时，live 里这两个目录下的子目录文件会被删掉，因为它们不可能出现在任何 payload 里。这符合替换语义，但值得知道。
