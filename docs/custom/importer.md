@@ -116,24 +116,26 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 
 归档里的四个目录是 `upload/`、`skills/`、`fonts/`、`media_creation/`，其中 `skills/` 与 `media_creation/` 会带子目录。目录与嵌套规则以 `OfficialBackupLayout` 为准。
 
-`PendingRestore` 现在的行为是合并：`buildEntries` 只遍历 payload，备份里没有的文件永远留着。启动时 `syncManagedFiles` 会把多余的 upload 文件重新登记进 `managed_files`，`skills/` 里的旧技能也会被扫到。
+这一项已经落地。`PendingRestore.buildRemovalEntries` 对归档里实际存在的附件目录，列出 live 目录里有、payload 里没有的文件，给每个文件合成一条 `install = false, hadOriginal = true` 的条目：apply 把目标移进 `originals/`，rollback 再移回来，journal 与 rollback 都不需要改，每条也仍然可重入。
 
-实现替换语义最省事、也不破坏现有契约的做法是**合成删除条目**，不是目录整体 rename：
+做成文件级条目而不是目录级 rename，是因为 journal 与 rollback 都按路径记录单个文件，加目录条目得为它们另加一套状态。
 
-- 在 publish 之前，对每个「归档里实际存在」的附件目录，列出 live 目录里有、payload 里没有的文件。
-- 给每个这样的文件追加一条 `install = false, hadOriginal = true` 的条目。`PendingRestore` 的 sidecar 条目已经是这个形状，journal 与 rollback 完全不用改，每条也仍然可重入。
-- rollback 时按现有逻辑把 `original` 移回去即可，都是文件，不会碰到 `Files.move` 对非空目录的限制。
-- 只处理归档里实际存在的目录：官方备份可以只带数据库，这时不能把用户 live 的附件目录清空。
+两个边界：
 
-`buildEntries` 的遍历范围要扩展成「payload 文件 + 合成删除条目」，条目仍然只有文件一种类型。
+- 只在数据库也一起替换时才做。只导附件时现有库还引用着 live 上的文件，删掉它们等于制造悬空引用，所以那种组合保持叠加语义。
+- 归档里「存在但为空」的目录无法表达：写归档的侧不写目录条目，读归档的侧也会跳过目录条目，所以空目录与「没有这个目录」在 payload 里长得一样。这一条记在已知限制里。
 
 ## 归档
 
-导入入口（`WebDavSync.restoreFromBackupFile`）先把原始 zip 复制一份到 `noBackupFilesDir/imported-backups/`，永不自动删除。它是官方自己产出的自包含文件，随时能被官方吃回去，也是导入写坏数据时唯一能回退的东西。
+这一项已经落地。导入入口（`WebDavSync.restoreFromBackupFile`）在恢复成功之后把原始 zip 复制一份到 `noBackupFilesDir/imported-backups/`，永不自动删除。它是官方自己产出的自包含文件，随时能被官方吃回去，也是导入写坏数据时唯一能回退的东西。
+
+只在成功之后归档：失败的恢复没有改动任何数据，不需要为它留底，留着只会堆积。
+
+`ImportedBackupArchive.store` 先写临时文件再原子改名，进程中途被杀不会留下截断的归档；文件名带毫秒并且不覆盖已有文件，同一秒内多次导入不会互相盖掉。它不依赖 Android，可直接用 JVM 测试覆盖。
 
 放 `noBackupFilesDir` 而不是 `filesDir`：后者的整个目录被 `app` 模块的 web 路由 `GET /api/files/path/{...}` 暴露出去。
 
-归档要在分流之前做，这样无论最终走 stageRestore 还是导入器都留了底。
+归档目前在应用内没有入口：`noBackupFilesDir` 不在 FileProvider 的共享路径里，web 路由也不服务它，所以取回需要 root 或 adb。加一个「已归档备份」的列表页是后续的事。
 
 ## 索引重建
 
@@ -175,14 +177,18 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 4. settings 校验、附件、归档。
 5. 验收。
 
-现在先做的两项不依赖上面任何一步：
+现在先做的两项不依赖上面任何一步，都已经落地：
 
-1. **归档**：在 `restoreFromBackupFile` 里落一份原始 zip，配一条 androidTest 验证它存在且内容是原文件。
-2. **附件替换**：给 `PendingRestore` 增加合成删除条目，配 androidTest 覆盖「live 多出来的附件被删除」「归档只带数据库时 live 附件不被删」「rollback 能把删掉的文件恢复」。
+1. **归档**：`ImportedBackupArchive.store` 加 `ImportedBackupArchiveTest`（JVM，四条：落盘内容、不覆盖旧档、不留临时文件、源缺失返回 null）。
+2. **附件替换**：`PendingRestore.buildRemovalEntries` 加 `PendingRestoreTest` 的新用例（JVM，覆盖「多余附件被删」「只导数据库时 live 附件不动」「只导附件时 live 附件不动」「嵌套的 skills 目录被递归替换」「rollback 恢复被删文件，且断言删除确实发生过」）。
 
 ## 已知限制
 
 - 导入是替换语义，不与现有数据合并。
+- 归档里「存在但为空」的附件目录无法表达：写归档的侧不写目录条目，读归档的侧也会跳过目录条目，所以空目录与「没有这个目录」在 payload 里长得一样，替换时会退化成合并。`skills/` 被清空后留下的空目录会被 `SkillManager` 当成待清理目录。
+- `upload/` 与 `fonts/` 在导出侧只收顶层文件，替换侧却是递归删除。live 里这两个目录下的子目录文件不可能出现在任何 payload 里，所以任何带这两个目录的导入都会删掉它们。这符合替换语义，但值得知道。
+- live 文件名里带反斜杠会让整次恢复失败：`resolveInside` 会拒绝这种路径。归档条目在 staging 阶段已经被同一规则拦下，所以这条只对 live 侧的名字生效，概率极低。
+- 归档目前在应用内取不回来，需要 root 或 adb。
 - 字段语义变化无法从 header 识别，只能靠流程。
 - 附件按 hash 去重（roadmap 2.3 的候选）落地后，导入时要把按路径的附件归并成 hash。读取层只需留出「附件路径 → 目标存储」的接口。
 - 官方兼容导出（要求 8）已由 C18 提供骨架，分叉时的裁剪仍待实现，不在本文件范围。

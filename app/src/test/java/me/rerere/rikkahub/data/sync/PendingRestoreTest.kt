@@ -78,11 +78,56 @@ class PendingRestoreTest {
         write(File(temporary.root, "files/upload/stale"), "stale upload")
         stage(restore())
         try {
-            restore().apply { throw IOException("Disk full") }
+            restore().apply {
+                // 进入 settings 回调时删除条目已经生效过，先确认它真的被移走了，
+                // 否则这条测试在「没有删除逻辑」的旧实现上也会通过。
+                assertFalse(File(temporary.root, "files/upload/stale").exists())
+                throw IOException("Disk full")
+            }
             error("Expected failure")
         } catch (_: RestoreFailedException) {
             assertEquals("stale upload", File(temporary.root, "files/upload/stale").readText())
         }
+    }
+
+    @Test fun databaseOnlyRestoreKeepsLiveAttachments() = runBlocking {
+        write(File(temporary.root, "files/upload/stale"), "stale upload")
+        write(database(), "old database")
+        val restore = restore()
+        val staging = restore.createStagingDirectory()
+        write(File(staging, "payload/database/rikka_hub"), "new database")
+        write(File(staging, "settings.json"), "new settings")
+        restore.publish(staging)
+        restore().apply { }
+        assertEquals("stale upload", File(temporary.root, "files/upload/stale").readText())
+    }
+
+    @Test fun filesOnlyRestoreKeepsAttachmentsMissingFromBackup() = runBlocking {
+        write(database(), "old database")
+        write(File(temporary.root, "files/upload/stale"), "stale upload")
+        val restore = restore()
+        val staging = restore.createStagingDirectory()
+        write(File(staging, "payload/files/upload/photo"), "new photo")
+        write(File(staging, "settings.json"), "new settings")
+        restore.publish(staging)
+        restore().apply { }
+        // 库没换，现有库还引用着 live 上的附件，不能删
+        assertEquals("stale upload", File(temporary.root, "files/upload/stale").readText())
+        assertEquals("new photo", File(temporary.root, "files/upload/photo").readText())
+    }
+
+    @Test fun nestedAttachmentFolderIsReplacedRecursively() = runBlocking {
+        write(File(temporary.root, "files/skills/old/SKILL.md"), "old skill")
+        write(database(), "old database")
+        val restore = restore()
+        val staging = restore.createStagingDirectory()
+        write(File(staging, "payload/database/rikka_hub"), "new database")
+        write(File(staging, "payload/files/skills/new/SKILL.md"), "new skill")
+        write(File(staging, "settings.json"), "new settings")
+        restore.publish(staging)
+        restore().apply { }
+        assertFalse(File(temporary.root, "files/skills/old/SKILL.md").exists())
+        assertEquals("new skill", File(temporary.root, "files/skills/new/SKILL.md").readText())
     }
 
     @Test fun failedSettingsWriteRestoresOriginalDatabaseAndSidecarsAndCanRetry() = runBlocking {

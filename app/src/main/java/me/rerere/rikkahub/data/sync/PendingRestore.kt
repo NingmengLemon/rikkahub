@@ -94,8 +94,10 @@ internal class PendingRestore(
         val entries = paths.map { path ->
             RestoreEntry(path, install = true, hadOriginal = targetFile(path).exists())
         }.toMutableList()
-        entries.addAll(buildRemovalEntries(paths))
+        // 附件替换只在数据库也一起换掉时做。只导附件的恢复会把 payload 叠到现有库上，那时
+        // 库还引用着 live 上的文件，删掉它们等于制造悬空引用。
         if (paths.contains("database/${databaseFile.name}")) {
+            entries.addAll(buildRemovalEntries(paths))
             // The new database is standalone. Keep the old DB's sidecars with the old DB only.
             for (suffix in listOf("-wal", "-shm", "-journal")) {
                 val path = "database/${databaseFile.name}$suffix"
@@ -108,9 +110,10 @@ internal class PendingRestore(
     /**
      * 归档里的附件目录按替换语义处理：live 目录里多出来、payload 里没有的文件要删掉。
      *
-     * 只针对归档里实际带了的目录。备份可以只带数据库，那种情况不能把 live 的附件清空。
+     * 只针对归档里实际带了的目录。备份可以只带数据库，那种情况不会走到这里，见 [buildEntries]。
      * 删除用 `install = false` 的条目表达，journal 与 rollback 原样复用：apply 会把目标移进
-     * `originals/`，rollback 再移回来。不引入目录级 rename，避免 `Files.move` 对非空目录的限制。
+     * `originals/`，rollback 再移回来。做成文件级条目而不是目录级 rename，是因为 journal 与
+     * rollback 都按路径记录单个文件，目录条目得为它们另加一套状态。
      */
     private fun buildRemovalEntries(payloadPaths: List<String>): List<RestoreEntry> {
         val presentFolders = payloadPaths
@@ -122,9 +125,10 @@ internal class PendingRestore(
         for (folder in presentFolders) {
             val live = File(filesDir, folder)
             if (!live.isDirectory) continue
-            val kept = payloadPaths.filter { it.startsWith("files/$folder/") }.toSet()
+            val prefix = "files/$folder/"
+            val kept = payloadPaths.filter { it.startsWith(prefix) }.toSet()
             live.walkTopDown().filter { it.isFile }.forEach { file ->
-                val path = "files/$folder/" + file.relativeTo(live).invariantSeparatorsPath
+                val path = prefix + file.relativeTo(live).invariantSeparatorsPath
                 if (path !in kept) {
                     removals.add(RestoreEntry(path, install = false, hadOriginal = true))
                 }

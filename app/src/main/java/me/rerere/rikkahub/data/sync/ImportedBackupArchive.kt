@@ -1,0 +1,34 @@
+package me.rerere.rikkahub.data.sync
+
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
+/**
+ * 导入成功的原始备份留底。
+ *
+ * 它是官方自己产出的自包含文件，随时能被官方吃回去，也是导入写坏数据时唯一能回退的东西。
+ * 只在恢复成功之后调用：失败的归档不修改任何数据，不需要为它留底，留着只会堆积。
+ */
+internal object ImportedBackupArchive {
+    private val stamp = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS")
+
+    /**
+     * 复制 [source] 到 [directory]，返回落盘位置；失败时返回 null，由调用方决定怎么记日志。
+     *
+     * 先写临时文件再原子改名，进程中途被杀不会留下截断的归档；文件名带毫秒，同一秒内多次
+     * 导入不会互相覆盖。不覆盖已有文件：宁可多出一份，也不要悄悄替换掉上一份。
+     */
+    fun store(source: File, directory: File): File? = runCatching {
+        check(directory.isDirectory || directory.mkdirs()) { "Cannot create archive directory" }
+        val target = File(directory, "imported_${stamp.format(LocalDateTime.now())}.zip")
+        check(!target.exists()) { "Imported backup archive already exists: ${target.name}" }
+        val temporary = File(directory, target.name + ".tmp")
+        Files.copy(source.toPath(), temporary.toPath(), REPLACE_EXISTING)
+        Files.move(temporary.toPath(), target.toPath(), ATOMIC_MOVE)
+        target
+    }.getOrNull()
+}
