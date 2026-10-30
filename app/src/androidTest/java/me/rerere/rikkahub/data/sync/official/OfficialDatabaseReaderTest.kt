@@ -38,9 +38,10 @@ class OfficialDatabaseReaderTest {
         OfficialDatabaseReader.open(file).use { reader ->
             assertTrue("应用库不该有快照之外的列", reader.unexpectedColumns.isEmpty())
             for (table in OfficialDatabaseSchema.TABLES.keys) {
-                assertTrue(reader.rows(table).count() >= 0)
+                // 空库是常态，只有 workspaces 里有上面那一行
+                val expected = if (table == "workspaces") 1 else 0
+                assertEquals("表 $table 的行数", expected, reader.rows(table).count())
             }
-            assertEquals(1, reader.rows("workspaces").count())
         }
     }
 

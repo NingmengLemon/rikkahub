@@ -29,8 +29,9 @@ internal class OfficialDatabaseReader private constructor(
     /**
      * 逐行读取一张表。
      *
-     * 返回的序列只能消费一次：底下的 cursor 在序列结束或提前终止时关闭，重复迭代会命中已关闭
-     * 的 cursor。读到的每一行都自带值，序列结束后仍然可读。
+     * 返回的序列只能消费一次，而且必须消费完。cursor 在序列正常走到结尾时关闭；调用方提前
+     * 终止（`first()`、`take()`、`break`）或取了不消费时，cursor 会留到 [close] 或 GC。
+     * 拿不准的话用 [forEachRow]。读到的每一行都自带值，序列结束后仍然可读。
      */
     fun rows(tableName: String): Sequence<OfficialRow> {
         val table = requireNotNull(OfficialDatabaseSchema.TABLES[tableName]) {
@@ -39,6 +40,11 @@ internal class OfficialDatabaseReader private constructor(
         val projection = table.columns.joinToString(",") { "`${it.name}`" }
         val cursor = database.rawQuery("SELECT $projection FROM `$tableName`", null)
         return cursorToRows(cursor, table)
+    }
+
+    /** 逐行读完一张表，保证 cursor 关闭。 */
+    fun forEachRow(tableName: String, block: (OfficialRow) -> Unit) {
+        rows(tableName).forEach(block)
     }
 
     override fun close() {

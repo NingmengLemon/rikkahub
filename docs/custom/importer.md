@@ -189,6 +189,8 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 - 归档里「存在但为空」的附件目录无法表达：写归档的侧不写目录条目，读归档的侧也会跳过目录条目，所以空目录与「没有这个目录」在 payload 里长得一样，替换时会退化成合并。`skills/` 被清空后留下的空目录会被 `SkillManager` 当成待清理目录。
 - `upload/` 与 `fonts/` 在导出侧只收顶层文件，替换侧却是递归删除。payload 同时带数据库时，live 里这两个目录下的子目录文件会被删掉，因为它们不可能出现在任何 payload 里。这符合替换语义，但值得知道。
 - `media_creation/` 下的 `.part` 临时文件导出时被跳过，替换时会当成「备份里没有」而删除。它们是半成品，删掉通常无害，但下载中的任务会受影响。
+- 当前设备上 androidTest 跑不起来：测试进程解析不到读取层的新类，已确认不是代码问题（类在 APK 里、设备 APK 与构建产物 md5 一致、应用本身能正常启动）。结构与类型判断抽成纯函数之后可以走 JVM 测试，碰 SQLite 的那部分等设备问题解决再验证。
+- 真正的官方备份样本还没拿到，读取层的正向测试暂时用应用自己创建的库当替身。
 - live 文件名里带反斜杠会让整次导入失败。校验放在 `buildRemovalEntries` 里、journal 落地之前，所以失败会走 `failed-*` 分支：用户看到「已保留原数据」，下次启动不会重播。漏掉这层校验的话，`apply` 会反复抛异常，而 `RikkaHubApp` 只捕获 `RestoreFailedException`，结果是每次启动都崩。这种文件名不需要 root 就能产生：`FileUtils` 从 provider 的 displayName 取扩展名，`foo.\x` 会拼出带反斜杠的名字。
 - 归档目前在应用内取不回来，需要 root 或 adb。
 - 字段语义变化无法从 header 识别，只能靠流程。
