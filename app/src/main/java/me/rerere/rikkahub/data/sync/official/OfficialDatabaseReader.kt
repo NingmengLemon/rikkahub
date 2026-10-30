@@ -2,6 +2,7 @@ package me.rerere.rikkahub.data.sync.official
 
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import android.util.Log
 import java.io.Closeable
 import java.io.File
 
@@ -11,8 +12,12 @@ import java.io.File
  * 表名与列名全部来自 [OfficialDatabaseSchema] 的冻结快照，不引用本仓库的 `@Entity`：官方库的
  * 结构怎么变、我们自己的库怎么演进，都不影响这里的读法。
  *
- * 打开时会核对每张表的列是否与快照一致。快照里有、库里没有的列说明官方做了破坏性迁移，
- * 直接失败；库里多出来的列忽略并记日志。读业务表，`message_fts*` 这类派生表跳过。
+ * 打开时核对三件事：`user_version` 与快照一致、每张表都在、每张表的列都不缺。快照里有、
+ * 库里没有的列说明官方做了破坏性迁移，直接失败；库里多出来的列记日志，不参与读取。
+ * `message_fts*` 这类派生表不在快照里，跳过。
+ *
+ * 结构判断本身在 [OfficialSchemaVerifier]、类型判断在 [OfficialFieldType]，两者都不依赖
+ * Android，可以在 JVM 上直接测。
  */
 internal class OfficialDatabaseReader private constructor(
     private val database: SQLiteDatabase,
@@ -21,6 +26,12 @@ internal class OfficialDatabaseReader private constructor(
     /** 库里有、快照里没有的列，诊断用 */
     val unexpectedColumns: Map<String, List<String>> = verifySchema()
 
+    /**
+     * 逐行读取一张表。
+     *
+     * 返回的序列只能消费一次：底下的 cursor 在序列结束或提前终止时关闭，重复迭代会命中已关闭
+     * 的 cursor。读到的每一行都自带值，序列结束后仍然可读。
+     */
     fun rows(tableName: String): Sequence<OfficialRow> {
         val table = requireNotNull(OfficialDatabaseSchema.TABLES[tableName]) {
             "未知的官方表：$tableName"
@@ -35,19 +46,22 @@ internal class OfficialDatabaseReader private constructor(
     }
 
     private fun verifySchema(): Map<String, List<String>> {
-        val unexpected = LinkedHashMap<String, List<String>>()
-        for ((name, table) in OfficialDatabaseSchema.TABLES) {
-            val liveColumns = database.rawQuery("PRAGMA table_info(`$name`)", null).use { cursor ->
+        val liveColumns = OfficialDatabaseSchema.TABLES.keys.associateWith { name ->
+            database.rawQuery("PRAGMA table_info(`$name`)", null).use { cursor ->
                 buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
             }
-            check(liveColumns.isNotEmpty()) { "官方库里没有表 $name" }
-            val expected = table.columns.map { it.name }
-            val missing = expected.filter { it !in liveColumns }
-            check(missing.isEmpty()) { "表 $name 缺少列 ${missing.joinToString()}" }
-            val extra = liveColumns.filter { it !in expected }
-            if (extra.isNotEmpty()) unexpected[name] = extra
+        }.filterValues { it.isNotEmpty() }
+
+        return when (val verdict = OfficialSchemaVerifier.verify(database.version, liveColumns)) {
+            is OfficialSchemaVerifier.Verdict.Ok -> {
+                verdict.unexpectedColumns.forEach { (table, columns) ->
+                    Log.w(TAG, "官方表 $table 有快照之外的列 ${columns.joinToString()}，已忽略")
+                }
+                verdict.unexpectedColumns
+            }
+
+            is OfficialSchemaVerifier.Verdict.Failed -> error(verdict.reason)
         }
-        return unexpected
     }
 
     /**
@@ -58,15 +72,11 @@ internal class OfficialDatabaseReader private constructor(
      */
     private fun cursorToRows(cursor: Cursor, table: OfficialDatabaseSchema.Table): Sequence<OfficialRow> = sequence {
         try {
+            val indices = table.columns.map { it.name to cursor.getColumnIndexOrThrow(it.name) }
             while (cursor.moveToNext()) {
-                val values = LinkedHashMap<String, Any?>(table.columns.size)
-                for (column in table.columns) {
-                    val index = cursor.getColumnIndex(column.name)
-                    values[column.name] = if (index < 0 || cursor.isNull(index)) {
-                        null
-                    } else {
-                        readValue(cursor, index, column)
-                    }
+                val values = LinkedHashMap<String, Any?>(indices.size)
+                for ((name, index) in indices) {
+                    values[name] = if (cursor.isNull(index)) null else readValue(cursor, index, name, table)
                 }
                 yield(OfficialRow(values))
             }
@@ -75,24 +85,41 @@ internal class OfficialDatabaseReader private constructor(
         }
     }
 
-    companion object {
-        fun open(databaseFile: File): OfficialDatabaseReader {
-            check(databaseFile.isFile) { "官方数据库不存在：${databaseFile.absolutePath}" }
-            return OfficialDatabaseReader(
-                SQLiteDatabase.openDatabase(databaseFile.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
-            )
+    private fun readValue(cursor: Cursor, index: Int, columnName: String, table: OfficialDatabaseSchema.Table): Any {
+        val column = requireNotNull(table.columns.firstOrNull { it.name == columnName }) {
+            "快照里没有列 ${table.name}.$columnName"
         }
-
-        private fun readValue(
-            cursor: Cursor,
-            index: Int,
-            column: OfficialDatabaseSchema.Column,
-        ): Any = when (column.affinity.uppercase()) {
+        val affinity = column.affinity.uppercase()
+        val actual = cursor.getType(index)
+        check(OfficialFieldType.accepts(affinity, actual)) {
+            "${table.name}.$columnName 期望 $affinity，库里存的是 ${OfficialFieldType.name(actual)}"
+        }
+        return when (affinity) {
             "INTEGER" -> cursor.getLong(index)
             "REAL" -> cursor.getDouble(index)
             "TEXT" -> cursor.getString(index)
             "BLOB" -> cursor.getBlob(index)
             else -> error("未处理的 affinity：${column.affinity}")
+        }
+    }
+
+    companion object {
+        private const val TAG = "OfficialDatabaseReader"
+
+        fun open(databaseFile: File): OfficialDatabaseReader {
+            check(databaseFile.isFile) { "官方数据库不存在：${databaseFile.absolutePath}" }
+            val database = SQLiteDatabase.openDatabase(
+                databaseFile.absolutePath,
+                null,
+                SQLiteDatabase.OPEN_READONLY,
+            )
+            // 校验失败时要把刚打开的库关掉，否则 fd 要等 finalize 才释放
+            return try {
+                OfficialDatabaseReader(database)
+            } catch (e: Exception) {
+                database.close()
+                throw e
+            }
         }
     }
 }

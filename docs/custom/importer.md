@@ -76,6 +76,8 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 
 ## 读取层
 
+这一节已经落地（C20）：`data/sync/official/OfficialDatabaseReader` 提供只读访问，打开时用 `PRAGMA table_info` 与 `user_version` 核对结构，结构与类型判断抽在 `OfficialSchemaVerifier` 里，不依赖 Android，可以直接跑 JVM 测试。
+
 `data/sync/official/OfficialDatabaseReader`。
 
 - `SQLiteDatabase.openDatabase(..., OPEN_READONLY)` 打开。不跑 integrity_check，那是 `DatabaseBackup.normalize` 的职责；导入器在解压后先调一次 `normalize` 把 `-wal` 合进去，再读。
