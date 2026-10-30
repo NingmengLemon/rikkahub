@@ -163,6 +163,8 @@
   <string name="backup_page_delete_success">删除成功</string>
   <string name="backup_page_export_desc">导出APP数据为文件</string>
   <string name="backup_page_exporting">正在导出...</string>
+  <string name="backup_page_export_official">导出给 RikkaHub</string>
+  <string name="backup_page_export_official_desc">生成官方 RikkaHub 可恢复的备份</string>
   <string name="backup_page_export_packing">正在打包 %1$d / %2$d</string>
   <string name="backup_page_saving">正在保存...</string>
   <string name="backup_page_files">文件</string>

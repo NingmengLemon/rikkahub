@@ -103,6 +103,8 @@
   <string name="backup_page_delete_success">Erfolgreich gelöscht</string>
   <string name="backup_page_export_desc">App-Daten in eine Datei exportieren</string>
   <string name="backup_page_exporting">Exportieren...</string>
+  <string name="backup_page_export_official">Für RikkaHub exportieren</string>
+  <string name="backup_page_export_official_desc">Ein Backup schreiben, das das offizielle RikkaHub wiederherstellen kann</string>
   <string name="backup_page_files">Dateien</string>
   <string name="backup_page_export_packing">Packe %1$d / %2$d</string>
   <string name="backup_page_saving">Wird gespeichert...</string>

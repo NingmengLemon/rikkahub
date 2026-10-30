@@ -30,6 +30,7 @@ import me.rerere.hugeicons.stroke.FileExport
 import me.rerere.hugeicons.stroke.FileImport
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.WebDavConfig
+import me.rerere.rikkahub.data.sync.BackupTarget
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.pages.backup.BackupVM
@@ -56,6 +57,8 @@ fun ImportExportTab(
     val selectedBackupItems by vm.localBackupItems.collectAsStateWithLifecycle()
     val exportProgress by vm.exportProgress.collectAsStateWithLifecycle()
     var isExporting by remember { mutableStateOf(false) }
+    // 两个导出入口共用同一个保存文件的 launcher，点击时先记住本次要产出给谁
+    var pendingExportTarget by remember { mutableStateOf(BackupTarget.SELF) }
     var isRestoring by remember { mutableStateOf(false) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
     var importSource by remember { mutableStateOf(ImportSource.LOCAL) }
@@ -69,7 +72,7 @@ fun ImportExportTab(
                 isExporting = true
                 runCatching {
                     // 打包成临时文件，期间 exportProgress 给出打包进度
-                    val exportFile = vm.exportToFile()
+                    val exportFile = vm.exportToFile(pendingExportTarget)
 
                     // 复制到用户选择的位置，这一段按字节走，没有逐项进度
                     context.contentResolver.openOutputStream(targetUri)?.use { outputStream ->
@@ -159,6 +162,7 @@ fun ImportExportTab(
             item(
                 onClick = if (!isExporting) {
                     {
+                        pendingExportTarget = BackupTarget.SELF
                         val timestamp = LocalDateTime.now()
                             .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
                         createDocumentLauncher.launch("rikkahub_backup_$timestamp.zip")
@@ -171,6 +175,30 @@ fun ImportExportTab(
                             stringResource(R.string.backup_page_exporting)
                         } else {
                             stringResource(R.string.backup_page_export_desc)
+                        }
+                    )
+                },
+                leadingContent = { BackupActionIcon(HugeIcons.FileExport, loading = isExporting) },
+            )
+
+            // 第二个出口：产出官方客户端读得回去的备份。双方 schema 一致时它与上面那份几乎一样，
+            // 一旦我们改了结构，这份会裁掉官方不认识的部分。
+            item(
+                onClick = if (!isExporting) {
+                    {
+                        pendingExportTarget = BackupTarget.OFFICIAL
+                        val timestamp = LocalDateTime.now()
+                            .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+                        createDocumentLauncher.launch("rikkahub_backup_official_$timestamp.zip")
+                    }
+                } else null,
+                headlineContent = { Text(stringResource(R.string.backup_page_export_official)) },
+                supportingContent = {
+                    Text(
+                        if (isExporting) {
+                            stringResource(R.string.backup_page_exporting)
+                        } else {
+                            stringResource(R.string.backup_page_export_official_desc)
                         }
                     )
                 },

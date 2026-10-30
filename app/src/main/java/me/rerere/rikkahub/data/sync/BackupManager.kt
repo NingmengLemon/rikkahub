@@ -23,6 +23,7 @@ import me.rerere.rikkahub.data.db.AppDatabaseFactory
 import me.rerere.rikkahub.data.db.SQLiteConfiguration
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.files.MediaCreationFiles
+import me.rerere.rikkahub.data.sync.official.OfficialDatabaseAdapter
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -50,6 +51,7 @@ class BackupManager(
     suspend fun createBackup(
         includeDatabase: Boolean,
         includeFiles: Boolean,
+        target: BackupTarget = BackupTarget.SELF,
         onProgress: ((BackupProgress) -> Unit)? = null,
     ): File = withContext(Dispatchers.IO) {
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
@@ -75,7 +77,11 @@ class BackupManager(
                 if (includeDatabase) {
                     val snapshot = File(staging, SQLiteConfiguration.DATABASE_NAME)
                     DatabaseBackup.createSnapshot(database.openHelper.writableDatabase, snapshot)
-                    addFile(zip, snapshot, DatabaseBackup.ARCHIVE_DATABASE)
+                    val databaseEntry = when (target) {
+                        BackupTarget.SELF -> snapshot
+                        BackupTarget.OFFICIAL -> OfficialDatabaseAdapter.adaptForOfficial(snapshot)
+                    }
+                    addFile(zip, databaseEntry, DatabaseBackup.ARCHIVE_DATABASE)
                     advance()
                 }
                 for (attachment in attachments) {

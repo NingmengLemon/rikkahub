@@ -163,6 +163,8 @@
   <string name="backup_page_delete_success">Удаление выполнено успешно</string>
   <string name="backup_page_export_desc">Экспортировать данные приложения в файл</string>
   <string name="backup_page_exporting">Экспорт…</string>
+  <string name="backup_page_export_official">Экспорт для RikkaHub</string>
+  <string name="backup_page_export_official_desc">Создать резервную копию, которую сможет восстановить официальный RikkaHub</string>
   <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
   <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">Файлы</string>

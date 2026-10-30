@@ -5,9 +5,10 @@ import android.util.Log
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import me.rerere.rikkahub.data.datastore.WebDavConfig
 import me.rerere.rikkahub.data.sync.BackupManager
 import me.rerere.rikkahub.data.sync.BackupProgress
-import me.rerere.rikkahub.data.datastore.WebDavConfig
+import me.rerere.rikkahub.data.sync.BackupTarget
 import me.rerere.rikkahub.utils.fileSizeToString
 import java.io.File
 import java.time.Instant
@@ -105,10 +106,12 @@ class WebDavSync(
 
     suspend fun prepareBackupFile(
         config: WebDavConfig,
+        target: BackupTarget = BackupTarget.SELF,
         onProgress: ((BackupProgress) -> Unit)? = null,
     ): File = backupManager.createBackup(
         includeDatabase = WebDavConfig.BackupItem.DATABASE in config.items,
         includeFiles = WebDavConfig.BackupItem.FILES in config.items,
+        target = target,
         onProgress = onProgress,
     )
 
@@ -117,7 +120,6 @@ class WebDavSync(
         includeDatabase = WebDavConfig.BackupItem.DATABASE in config.items,
         includeFiles = WebDavConfig.BackupItem.FILES in config.items,
     )
-
 }
 
 data class WebDavBackupItem(

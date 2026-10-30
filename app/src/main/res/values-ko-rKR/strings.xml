@@ -163,6 +163,8 @@
   <string name="backup_page_delete_success">삭제 성공</string>
   <string name="backup_page_export_desc">앱 데이터를 파일로 내보내기</string>
   <string name="backup_page_exporting">내보내는 중...</string>
+  <string name="backup_page_export_official">RikkaHub용으로 내보내기</string>
+  <string name="backup_page_export_official_desc">공식 RikkaHub에서 복원할 수 있는 백업을 만듭니다</string>
   <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
   <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">파일</string>

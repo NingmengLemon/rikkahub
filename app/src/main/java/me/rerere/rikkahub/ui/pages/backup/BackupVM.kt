@@ -11,6 +11,7 @@ import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.datastore.WebDavConfig
 import me.rerere.rikkahub.data.sync.BackupProgress
+import me.rerere.rikkahub.data.sync.BackupTarget
 import me.rerere.rikkahub.data.sync.webdav.WebDavBackupItem
 import me.rerere.rikkahub.data.sync.webdav.WebDavSync
 import me.rerere.rikkahub.utils.UiState
@@ -85,12 +86,15 @@ class BackupVM(
     /**
      * 打包成临时 zip 文件。打包期间 [exportProgress] 给出已写入的条目数，
      * 返回后置为 null，调用方据此切换到"写入目标文件"的阶段。
+     *
+     * [target] 决定产出给谁读：自家备份带全量数据，官方兼容备份按官方 schema 裁剪。
      */
-    suspend fun exportToFile(): File {
+    suspend fun exportToFile(target: BackupTarget = BackupTarget.SELF): File {
         _exportProgress.value = BackupProgress(done = 0, total = 0)
         try {
             val file = webDavSync.prepareBackupFile(
                 config = settings.value.webDavConfig.copy(items = localBackupItems.value),
+                target = target,
                 onProgress = { _exportProgress.value = it },
             )
             recordBackupTime()

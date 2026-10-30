@@ -185,6 +185,8 @@
   <string name="backup_page_delete_success">تم الحذف بنجاح</string>
   <string name="backup_page_export_desc">تصدير بيانات التطبيق إلى ملف</string>
   <string name="backup_page_exporting">جارٍ التصدير...</string>
+  <string name="backup_page_export_official">تصدير إلى RikkaHub</string>
+  <string name="backup_page_export_official_desc">إنشاء نسخة احتياطية يمكن لتطبيق RikkaHub الرسمي استعادتها</string>
   <string name="backup_page_export_packing">Packing %1$d / %2$d</string>
   <string name="backup_page_saving">Saving...</string>
   <string name="backup_page_files">الملفات</string>
