@@ -179,7 +179,7 @@ rg -n 'RikkaHub' app/src/main/res oauth/src/main/res -g '**/values*/strings.xml'
 
 下面清单里写「7 个 locale」或具体份数的条目，指的是做那项定制时仓库里的份数，德语是上游 3.1.1 才加的；同步这类改动时按当前的 8 份处理。
 
-当前的缺口是 `values-de` 缺 4 条本分支新增的文案（`backup_page_export_packing`、`backup_page_saving`、`backup_page_import_from_official`、`backup_page_import_official_desc`），德语下回落到英文。补翻译用 `tools/i18n`。
+`values-de` 已经不缺条目，本分支新增的文案在八份 locale 里都补齐了。反方向还有缺口：`values-ar`、`values-ja`、`values-ko-rKR`、`values-ru`、`values-zh-rTW` 各缺 3 条上游自己没翻的压缩上下文文案（`chat_page_compress_keep_recent` 及其描述、`chat_page_compress_not_enough_messages`），那属于上游范围。新加文案时八份一起补，用 `tools/i18n`。
 
 ## 构建
 
