@@ -18,8 +18,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.datastore.migration.SettingsJsonMigrator
-import me.rerere.rikkahub.data.db.AppDatabaseFactory
 import me.rerere.rikkahub.data.db.AppDatabase
+import me.rerere.rikkahub.data.db.AppDatabaseFactory
 import me.rerere.rikkahub.data.db.SQLiteConfiguration
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.files.MediaCreationFiles
@@ -67,7 +67,7 @@ class BackupManager(
             }
 
             ZipOutputStream(FileOutputStream(archive)).use { zip ->
-                zip.putNextEntry(ZipEntry("settings.json"))
+                zip.putNextEntry(ZipEntry(SETTINGS_ENTRY))
                 val settingsJson = json.encodeSettings(settings, settingsStore.launchCountFlow.first())
                 zip.write(settingsJson.toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
@@ -97,14 +97,19 @@ class BackupManager(
         val result = ArrayList<AttachmentEntry>()
         for (folder in ATTACHMENT_FOLDERS) {
             val directory = File(context.filesDir, folder)
-            val files = if (folder in NESTED_ATTACHMENT_FOLDERS) directory.walkTopDown().asSequence()
-            else directory.listFiles().orEmpty().asSequence()
+            val files = if (folder in NESTED_ATTACHMENT_FOLDERS) {
+                directory.walkTopDown().asSequence()
+            } else {
+                directory.listFiles().orEmpty().asSequence()
+            }
             for (file in files.filter { it.isFile }) {
                 currentCoroutineContext().ensureActive()
                 // A media result still being downloaded is incomplete and gets renamed when it finishes.
                 if (folder == FileFolders.MEDIA_CREATION &&
                     file.name.endsWith(MediaCreationFiles.PARTIAL_SUFFIX)
-                ) continue
+                ) {
+                    continue
+                }
                 val relative = file.relativeTo(directory).invariantSeparatorsPath
                 PendingRestore.resolveInside(directory, relative)
                 result += AttachmentEntry(file = file, archiveName = "$folder/$relative")
@@ -135,7 +140,9 @@ class BackupManager(
                                 DatabaseBackup.SHM -> null // Rebuilt by SQLite; never restore shared-memory state.
                                 else -> if (includeFiles && isAttachment(entry.name)) {
                                     PendingRestore.resolveInside(File(payload, "files"), entry.name)
-                                } else null
+                                } else {
+                                    null
+                                }
                             } ?: continue
                             require(seen.add(entry.name)) { "Duplicate backup entry: ${entry.name}" }
                             check(target.parentFile!!.isDirectory || target.parentFile!!.mkdirs()) {
@@ -170,7 +177,10 @@ class BackupManager(
                         val settings = json.decodeFromString<Settings>(migrated)
                         require(!settings.init) { "Backup contains uninitialized settings" }
                         // Persist the migrated value once, including generated IDs, for restart/retry consistency.
-                        PendingRestore.writeDurably(settingsFile, json.encodeSettings(settings, json.launchCountOf(migrated)))
+                        PendingRestore.writeDurably(
+                            settingsFile,
+                            json.encodeSettings(settings, json.launchCountOf(migrated))
+                        )
                     }
                     currentCoroutineContext().ensureActive()
                     restore.publish(staging)
@@ -198,14 +208,18 @@ class BackupManager(
     private data class AttachmentEntry(val file: File, val archiveName: String)
 
     companion object {
-        private val ATTACHMENT_FOLDERS =
+        // 归档里的顶层条目名。官方格式由 data/sync/official/OfficialBackupLayout 冻结，
+        // 那里与这里对账，改动其中一个就要同步另一个。
+        internal const val SETTINGS_ENTRY = "settings.json"
+
+        internal val ATTACHMENT_FOLDERS =
             listOf(FileFolders.UPLOAD, FileFolders.SKILLS, FileFolders.FONTS, FileFolders.MEDIA_CREATION)
 
         /** Backed up with their subdirectories; the other folders only contain top-level files. */
-        private val NESTED_ATTACHMENT_FOLDERS = setOf(FileFolders.SKILLS, FileFolders.MEDIA_CREATION)
+        internal val NESTED_ATTACHMENT_FOLDERS = setOf(FileFolders.SKILLS, FileFolders.MEDIA_CREATION)
 
         // 启动次数不在 Settings 里，备份文件里仍放在 settings.json 的这个字段，和旧备份保持一致
-        private const val LAUNCH_COUNT_KEY = "launchCount"
+        internal const val LAUNCH_COUNT_KEY = "launchCount"
 
         private fun Json.encodeSettings(settings: Settings, launchCount: Int): String {
             val fields = encodeToJsonElement(settings).jsonObject + (LAUNCH_COUNT_KEY to JsonPrimitive(launchCount))

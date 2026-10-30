@@ -2,24 +2,29 @@ package me.rerere.rikkahub.data.sync.official
 
 /**
  * 官方 RikkaHub 数据库的结构快照。
- *
+
  * 这份快照是冻结的：它描述官方客户端导出的备份里有什么，不随本仓库的 Room schema
- * 演进。改它只有一个理由，就是官方升了版本；那时同步更新 [VERSION] 与表结构，并重跑
- * 导入侧与两个导出出口的样本。
+ * 演进。它将来要服务两件事，目前都还没实现：导入器按它用裸 SQL 读官方库，官方兼容
+ * 导出按它把我们的库重建成官方形状。
  *
- * 数据来自 app/schemas/me.rerere.rikkahub.data.db.AppDatabase/32.json，
- * `OfficialDatabaseSchemaTest` 会拿该文件对账，抄错或官方升级后忘了更新都会失败。
+ * 修它只有一个理由，就是官方升了版本：同步更新 [VERSION] 与下面的结构，并重跑
+ * `OfficialDatabaseSchemaTest`。自家 schema 一旦与官方分叉，版本判定的那条断言要重做。
+ *
+ * 数据来自 app/schemas/me.rerere.rikkahub.data.db.AppDatabase/32.json。官方库里还有
+ * `message_fts` 这类由手写 SQL 建的全文索引表，它们不在 Room 的 schema 里，也不在这份
+ * 快照里：那是派生数据，`AppDatabaseFactory` 每次打开都会重建，导入时忽略即可。
  */
 internal object OfficialDatabaseSchema {
     const val VERSION = 32
 
-    /** 官方 v32 的 Room schema identity，用来和官方库的 room_master_table 对照 */
+    /** 官方 v32 的 Room schema identity，可用来和官方库的 room_master_table 对照 */
     const val IDENTITY_HASH = "c64deeb13766eaf6528a2f4f6965c836"
 
-    val tables: Map<String, Table> = listOf(
+    val TABLES: Map<String, Table> = listOf(
         Table(
             name = "ConversationEntity",
             primaryKey = listOf("id"),
+            autoIncrement = false,
             columns = listOf(
                 Column("id", "TEXT", notNull = true),
                 Column("assistant_id", "TEXT", notNull = true, defaultValue = "'0950e2dc-9bd5-4801-afa3-aa887aa36b4e'"),
@@ -36,28 +41,44 @@ internal object OfficialDatabaseSchema {
                 Column("folder_id", "TEXT", notNull = true, defaultValue = "''"),
                 Column("config", "TEXT", notNull = true, defaultValue = "''"),
             ),
+            indices = listOf(),
+            foreignKeys = listOf(),
         ),
         Table(
             name = "memory_file",
             primaryKey = listOf("assistant_id", "path"),
+            autoIncrement = false,
             columns = listOf(
                 Column("assistant_id", "TEXT", notNull = true),
                 Column("path", "TEXT", notNull = true),
                 Column("content", "TEXT", notNull = true),
                 Column("updated_at", "INTEGER", notNull = true),
             ),
+            indices = listOf(),
+            foreignKeys = listOf(),
         ),
         Table(
             name = "memory_consolidation",
             primaryKey = listOf("conversation_id"),
+            autoIncrement = false,
             columns = listOf(
                 Column("conversation_id", "TEXT", notNull = true),
                 Column("consolidated_at", "INTEGER", notNull = true),
+            ),
+            indices = listOf(),
+            foreignKeys = listOf(
+                ForeignKey(
+                    table = "ConversationEntity",
+                    columns = listOf("conversation_id"),
+                    referencedColumns = listOf("id"),
+                    onDelete = "CASCADE"
+                ),
             ),
         ),
         Table(
             name = "GenMediaEntity",
             primaryKey = listOf("id"),
+            autoIncrement = true,
             columns = listOf(
                 Column("id", "INTEGER", notNull = true),
                 Column("path", "TEXT", notNull = true),
@@ -67,10 +88,13 @@ internal object OfficialDatabaseSchema {
                 Column("type", "TEXT", notNull = true, defaultValue = "'image_generation'"),
                 Column("source_paths", "TEXT", notNull = false),
             ),
+            indices = listOf(),
+            foreignKeys = listOf(),
         ),
         Table(
             name = "message_node",
             primaryKey = listOf("id"),
+            autoIncrement = false,
             columns = listOf(
                 Column("id", "TEXT", notNull = true),
                 Column("conversation_id", "TEXT", notNull = true),
@@ -78,10 +102,22 @@ internal object OfficialDatabaseSchema {
                 Column("messages", "TEXT", notNull = true),
                 Column("select_index", "INTEGER", notNull = true),
             ),
+            indices = listOf(
+                Index("index_message_node_conversation_id", unique = false, columns = listOf("conversation_id")),
+            ),
+            foreignKeys = listOf(
+                ForeignKey(
+                    table = "ConversationEntity",
+                    columns = listOf("conversation_id"),
+                    referencedColumns = listOf("id"),
+                    onDelete = "CASCADE"
+                ),
+            ),
         ),
         Table(
             name = "managed_files",
             primaryKey = listOf("id"),
+            autoIncrement = true,
             columns = listOf(
                 Column("id", "INTEGER", notNull = true),
                 Column("folder", "TEXT", notNull = true),
@@ -92,10 +128,16 @@ internal object OfficialDatabaseSchema {
                 Column("created_at", "INTEGER", notNull = true),
                 Column("updated_at", "INTEGER", notNull = true),
             ),
+            indices = listOf(
+                Index("index_managed_files_relative_path", unique = true, columns = listOf("relative_path")),
+                Index("index_managed_files_folder", unique = false, columns = listOf("folder")),
+            ),
+            foreignKeys = listOf(),
         ),
         Table(
             name = "favorites",
             primaryKey = listOf("id"),
+            autoIncrement = false,
             columns = listOf(
                 Column("id", "TEXT", notNull = true),
                 Column("type", "TEXT", notNull = true),
@@ -106,10 +148,17 @@ internal object OfficialDatabaseSchema {
                 Column("created_at", "INTEGER", notNull = true),
                 Column("updated_at", "INTEGER", notNull = true),
             ),
+            indices = listOf(
+                Index("index_favorites_ref_key", unique = true, columns = listOf("ref_key")),
+                Index("index_favorites_type", unique = false, columns = listOf("type")),
+                Index("index_favorites_created_at", unique = false, columns = listOf("created_at")),
+            ),
+            foreignKeys = listOf(),
         ),
         Table(
             name = "workspaces",
             primaryKey = listOf("id"),
+            autoIncrement = false,
             columns = listOf(
                 Column("id", "TEXT", notNull = true),
                 Column("name", "TEXT", notNull = true),
@@ -123,10 +172,16 @@ internal object OfficialDatabaseSchema {
                 Column("type", "TEXT", notNull = true, defaultValue = "'LOCAL'"),
                 Column("ssh_config", "TEXT", notNull = false),
             ),
+            indices = listOf(
+                Index("index_workspaces_root", unique = true, columns = listOf("root")),
+                Index("index_workspaces_updated_at", unique = false, columns = listOf("updated_at")),
+            ),
+            foreignKeys = listOf(),
         ),
         Table(
             name = "conversation_folder",
             primaryKey = listOf("id"),
+            autoIncrement = false,
             columns = listOf(
                 Column("id", "TEXT", notNull = true),
                 Column("assistant_id", "TEXT", notNull = true),
@@ -134,10 +189,15 @@ internal object OfficialDatabaseSchema {
                 Column("sort_index", "INTEGER", notNull = true, defaultValue = "0"),
                 Column("create_at", "INTEGER", notNull = true),
             ),
+            indices = listOf(
+                Index("index_conversation_folder_assistant_id", unique = false, columns = listOf("assistant_id")),
+            ),
+            foreignKeys = listOf(),
         ),
         Table(
             name = "media_creation_session",
             primaryKey = listOf("id"),
+            autoIncrement = false,
             columns = listOf(
                 Column("id", "TEXT", notNull = true),
                 Column("title", "TEXT", notNull = true),
@@ -145,20 +205,35 @@ internal object OfficialDatabaseSchema {
                 Column("create_at", "INTEGER", notNull = true),
                 Column("update_at", "INTEGER", notNull = true),
             ),
+            indices = listOf(),
+            foreignKeys = listOf(),
         ),
         Table(
             name = "media_creation_node",
             primaryKey = listOf("id"),
+            autoIncrement = false,
             columns = listOf(
                 Column("id", "TEXT", notNull = true),
                 Column("session_id", "TEXT", notNull = true),
                 Column("selected_record_id", "TEXT", notNull = true),
                 Column("create_at", "INTEGER", notNull = true),
             ),
+            indices = listOf(
+                Index("index_media_creation_node_session_id", unique = false, columns = listOf("session_id")),
+            ),
+            foreignKeys = listOf(
+                ForeignKey(
+                    table = "media_creation_session",
+                    columns = listOf("session_id"),
+                    referencedColumns = listOf("id"),
+                    onDelete = "CASCADE"
+                ),
+            ),
         ),
         Table(
             name = "media_creation_record",
             primaryKey = listOf("id"),
+            autoIncrement = false,
             columns = listOf(
                 Column("id", "TEXT", notNull = true),
                 Column("session_id", "TEXT", notNull = true),
@@ -177,10 +252,29 @@ internal object OfficialDatabaseSchema {
                 Column("create_at", "INTEGER", notNull = true),
                 Column("update_at", "INTEGER", notNull = true),
             ),
+            indices = listOf(
+                Index("index_media_creation_record_session_id", unique = false, columns = listOf("session_id")),
+                Index("index_media_creation_record_node_id", unique = false, columns = listOf("node_id")),
+            ),
+            foreignKeys = listOf(
+                ForeignKey(
+                    table = "media_creation_session",
+                    columns = listOf("session_id"),
+                    referencedColumns = listOf("id"),
+                    onDelete = "CASCADE"
+                ),
+                ForeignKey(
+                    table = "media_creation_node",
+                    columns = listOf("node_id"),
+                    referencedColumns = listOf("id"),
+                    onDelete = "CASCADE"
+                ),
+            ),
         ),
         Table(
             name = "translation_history",
             primaryKey = listOf("id"),
+            autoIncrement = false,
             columns = listOf(
                 Column("id", "TEXT", notNull = true),
                 Column("source_text", "TEXT", notNull = true),
@@ -189,10 +283,15 @@ internal object OfficialDatabaseSchema {
                 Column("model_id", "TEXT", notNull = true),
                 Column("create_at", "INTEGER", notNull = true),
             ),
+            indices = listOf(
+                Index("index_translation_history_create_at", unique = false, columns = listOf("create_at")),
+            ),
+            foreignKeys = listOf(),
         ),
         Table(
             name = "usage_record",
             primaryKey = listOf("id"),
+            autoIncrement = true,
             columns = listOf(
                 Column("id", "INTEGER", notNull = true),
                 Column("created_at", "INTEGER", notNull = true),
@@ -206,23 +305,39 @@ internal object OfficialDatabaseSchema {
                 Column("completion_tokens", "INTEGER", notNull = true),
                 Column("cached_tokens", "INTEGER", notNull = true),
             ),
+            indices = listOf(
+                Index("index_usage_record_created_at", unique = false, columns = listOf("created_at")),
+            ),
+            foreignKeys = listOf(),
         ),
     ).associateBy { it.name }
-
-    val tableNames: Set<String> get() = tables.keys
 
     data class Table(
         val name: String,
         val primaryKey: List<String>,
+        val autoIncrement: Boolean,
         val columns: List<Column>,
-    ) {
-        val columnNames: Set<String> = columns.mapTo(LinkedHashSet()) { it.name }
-    }
+        val indices: List<Index>,
+        val foreignKeys: List<ForeignKey>,
+    )
 
     data class Column(
         val name: String,
         val affinity: String,
         val notNull: Boolean,
         val defaultValue: String? = null,
+    )
+
+    data class Index(
+        val name: String,
+        val unique: Boolean,
+        val columns: List<String>,
+    )
+
+    data class ForeignKey(
+        val table: String,
+        val columns: List<String>,
+        val referencedColumns: List<String>,
+        val onDelete: String,
     )
 }
