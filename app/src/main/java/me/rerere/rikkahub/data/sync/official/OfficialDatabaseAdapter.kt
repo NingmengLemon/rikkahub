@@ -1,6 +1,8 @@
 package me.rerere.rikkahub.data.sync.official
 
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteDatabaseCorruptException
+import android.database.sqlite.SQLiteDiskIOException
 import android.database.sqlite.SQLiteException
 import java.io.File
 
@@ -44,13 +46,17 @@ internal object OfficialDatabaseAdapter {
             val version = database.rawQuery("PRAGMA user_version", null).use { cursor ->
                 if (cursor.moveToFirst()) cursor.getInt(0) else 0
             }
-            // room_master_table 是 Room 自己维护的单行表。缺失或读不了时按「身份未知」处理，
-            // 由 compare 判成 Diverged，而不是让 SQLiteException 一路上抛成另一类失败。
+            // room_master_table 是 Room 自己维护的单行表。表不存在（更早的库）按「身份未知」处理，
+            // 由 compare 判成 Diverged。数据库损坏或磁盘 IO 错误不属于这一类，原样抛出去，
+            // 否则会被误报成「schema 分叉」而掩盖真正的问题。
             val identityHash = runCatching {
                 database.rawQuery("SELECT identity_hash FROM room_master_table LIMIT 1", null)
                     .use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
             }.getOrElse { error ->
-                if (error is SQLiteException) null else throw error
+                val tolerable = error is SQLiteException &&
+                    error !is SQLiteDatabaseCorruptException &&
+                    error !is SQLiteDiskIOException
+                if (tolerable) null else throw error
             }
             version to identityHash
         } finally {

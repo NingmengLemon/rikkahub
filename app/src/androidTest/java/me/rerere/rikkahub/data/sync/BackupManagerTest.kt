@@ -104,10 +104,10 @@ class BackupManagerTest {
     /**
      * 官方兼容出口的核心安全属性：双方 schema 一致时原样产出，分叉时直接失败。
      *
-     * 现在本仓库的 schema 与官方 v32 一致，所以这里只能验证「一致时能产出、且产出的库
-     * 与自家备份读得到同样的内容」。分叉分支由 `OfficialDatabaseCompatibilityTest` 覆盖。
+     * 现在本仓库的 schema 与官方 v32 一致，所以这里只能验证「一致时能产出归档，且该归档能被
+     * 恢复流程接受」。分叉分支由 `OfficialDatabaseCompatibilityTest` 覆盖。
      */
-    @Test fun officialTargetProducesRestorableArchiveWhileSchemasMatch() = runBlocking {
+    @Test fun officialTargetWritesArchiveThatStagingAccepts() = runBlocking {
         val archive = manager.createBackup(
             includeDatabase = true,
             includeFiles = false,
