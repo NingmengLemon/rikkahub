@@ -4,16 +4,14 @@
 
 ## 现状与优先级
 
-导入器本体的实现**排在分叉之后**，不是现在。理由是一条实测事实：官方 v32 的 schema identity 与本仓库的完全相同（`c64deeb13766eaf6528a2f4f6965c836`），所以真实的官方备份进来时，分流会判定它「就是本仓库的库」，直接走现有的 `stageRestore`，导入器不会被触发。
+导入器本体**与第一次改 Room schema 是同一批工作**，不提前单独做。理由是一条实测事实：官方 v32 的 schema identity 与本仓库的完全相同（`c64deeb13766eaf6528a2f4f6965c836`），所以真实的官方备份进来时，分流会判定它「就是本仓库的库」，直接走现有的 `stageRestore`，导入器不会被触发。
 
-导入器真正被需要，是在我们改动 Room schema 之后。在那之前实现它，没有真实场景可用，验收只能靠伪造样本（改掉 identity 或版本的官方备份），而伪造样本验证不了真实路径。
+导入器真正被需要，是在我们改动 Room schema 之后。在那之前实现它，没有真实场景可用，验收只能靠伪造样本（改掉 identity 或版本的官方备份），而伪造样本验证不了真实路径。反过来，改 schema 又要靠导入器保命，所以两者只能同一批做，顺序是导入器先落地并验证，再改结构。
 
-所以现在落地的是两件与「分叉后是否需要导入器」无关、本身就有价值的事：
+不依赖分叉的两项已经落地：
 
-1. **附件目录替换**：现在导入官方备份，附件是合并而不是替换。目标目录里多出来的文件永远留着，启动时 `syncManagedFiles` 还会把它们重新登记进 `managed_files`。见「附件替换」一节。
-2. **归档原始 zip**：现在导入完，用户选的备份文件就没了。见「归档」一节。
-
-这两项先做，导入器本体按本文件的设计在分叉时实现。
+1. **附件目录替换**：见「附件替换」一节。
+2. **归档原始 zip**：见「归档」一节。
 
 ## 现有的恢复流程
 
@@ -66,14 +64,13 @@ version < ourVersion                   → stageRestore（迁移链）
 
 分叉之后，导入器不改正在用的库，而是造一份结构等同于当前版本的库，再走现有安装流程：
 
-1. 归档原始 zip（见「归档」）。
-2. 解压到 `PendingRestore.createStagingDirectory()` 的 `preparing-*` 目录，保留 `rikka_hub-wal` 这类旧格式条目。
-3. `OfficialDatabaseReader` 把官方库读成行数据。
-4. 在 staging 的 `payload/database/` 下新建空的 Room 库，把行数据写进去。
+1. 解压到 `PendingRestore.createStagingDirectory()` 的 `preparing-*` 目录，保留 `rikka_hub-wal` 这类旧格式条目。
+2. `OfficialDatabaseReader` 把官方库读成行数据。
+3. 在 staging 的 `payload/database/` 下新建空的 Room 库，把行数据写进去。
    - 文件名必须是 `rikka_hub`：`PendingRestore.buildEntries` 按 `database/<name>` 识别，`targetFile` 也只接受这个名字，其他名字会在 apply 时直接报错。
    - 写完后按现有顺序收尾：`try { checkpoint } finally { close }`，再 `removeSidecars`。留着非空的 `-wal` 会让 `buildEntries` 对同一路径生成两条 entry。
-5. settings 按原流程迁移、解码、重新编码，`launchCount` 一并带进 pending 的 `settings.json`。
-6. `PendingRestore.publish(staging)`，重启时原子替换。
+4. settings 按原流程迁移、解码、重新编码，`launchCount` 一并带进 pending 的 `settings.json`。
+5. `PendingRestore.publish(staging)`，重启时原子替换。
 
 payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/files/<附件路径>`，`settings.json` 放在 staging 根。payload 为空时 `apply` 会写一份空 journal 然后返回 true，也就是「静默成功、什么都没装」，所以导入器必须确认至少写入了数据库或附件。
 
@@ -127,9 +124,11 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 
 ## 归档
 
-这一项已经落地。导入入口（`WebDavSync.restoreFromBackupFile`）在恢复成功之后把原始 zip 复制一份到 `noBackupFilesDir/imported-backups/`，永不自动删除。它是官方自己产出的自包含文件，随时能被官方吃回去，也是导入写坏数据时唯一能回退的东西。
+这一项已经落地。导入入口（`WebDavSync.restoreFromBackupFile`）在 `stageRestore` 返回之后把原始 zip 复制一份到 `noBackupFilesDir/imported-backups/`，永不自动删除。它是官方自己产出的自包含文件，随时能被官方吃回去，也是导入写坏数据时唯一能回退的东西。
 
-只在成功之后归档：失败的恢复没有改动任何数据，不需要为它留底，留着只会堆积。
+归档才发生在 `publish` 之后：那时库还没真正换上，安装要等下一次启动的 `apply`。所以后面那次安装失败时，归档里仍然留着这份原始备份，这正是它该在的位置。
+
+只在 `stageRestore` 成功之后归档：失败的恢复没有改动任何数据，不需要为它留底，留着只会堆积。
 
 `ImportedBackupArchive.store` 先写临时文件再原子改名，进程中途被杀不会留下截断的归档；文件名带毫秒并且不覆盖已有文件，同一秒内多次导入不会互相盖掉。它不依赖 Android，可直接用 JVM 测试覆盖。
 
@@ -185,9 +184,11 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 ## 已知限制
 
 - 导入是替换语义，不与现有数据合并。
+- 附件替换只在 payload 同时带数据库时发生。只导附件的恢复是叠加：现有库还在引用 live 上的文件，删掉它们等于制造悬空引用。
 - 归档里「存在但为空」的附件目录无法表达：写归档的侧不写目录条目，读归档的侧也会跳过目录条目，所以空目录与「没有这个目录」在 payload 里长得一样，替换时会退化成合并。`skills/` 被清空后留下的空目录会被 `SkillManager` 当成待清理目录。
-- `upload/` 与 `fonts/` 在导出侧只收顶层文件，替换侧却是递归删除。live 里这两个目录下的子目录文件不可能出现在任何 payload 里，所以任何带这两个目录的导入都会删掉它们。这符合替换语义，但值得知道。
-- live 文件名里带反斜杠会让整次恢复失败：`resolveInside` 会拒绝这种路径。归档条目在 staging 阶段已经被同一规则拦下，所以这条只对 live 侧的名字生效，概率极低。
+- `upload/` 与 `fonts/` 在导出侧只收顶层文件，替换侧却是递归删除。payload 同时带数据库时，live 里这两个目录下的子目录文件会被删掉，因为它们不可能出现在任何 payload 里。这符合替换语义，但值得知道。
+- `media_creation/` 下的 `.part` 临时文件导出时被跳过，替换时会当成「备份里没有」而删除。它们是半成品，删掉通常无害，但下载中的任务会受影响。
+- live 文件名里带反斜杠会让整次导入失败。校验放在 `buildRemovalEntries` 里、journal 落地之前，所以失败会走 `failed-*` 分支：用户看到「已保留原数据」，下次启动不会重播。漏掉这层校验的话，`apply` 会反复抛异常，而 `RikkaHubApp` 只捕获 `RestoreFailedException`，结果是每次启动都崩。这种文件名不需要 root 就能产生：`FileUtils` 从 provider 的 displayName 取扩展名，`foo.\x` 会拼出带反斜杠的名字。
 - 归档目前在应用内取不回来，需要 root 或 adb。
 - 字段语义变化无法从 header 识别，只能靠流程。
 - 附件按 hash 去重（roadmap 2.3 的候选）落地后，导入时要把按路径的附件归并成 hash。读取层只需留出「附件路径 → 目标存储」的接口。

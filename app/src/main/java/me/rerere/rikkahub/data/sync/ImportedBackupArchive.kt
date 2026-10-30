@@ -17,12 +17,12 @@ internal object ImportedBackupArchive {
     private val stamp = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS")
 
     /**
-     * 复制 [source] 到 [directory]，返回落盘位置；失败时返回 null，由调用方决定怎么记日志。
+     * 复制 [source] 到 [directory]，返回落盘位置；失败时返回带原因的 [Result]，由调用方记日志。
      *
      * 先写临时文件再原子改名，进程中途被杀不会留下截断的归档；文件名带毫秒，同一秒内多次
      * 导入不会互相覆盖。不覆盖已有文件：宁可多出一份，也不要悄悄替换掉上一份。
      */
-    fun store(source: File, directory: File): File? = runCatching {
+    fun store(source: File, directory: File): Result<File> = runCatching {
         check(directory.isDirectory || directory.mkdirs()) { "Cannot create archive directory" }
         val target = File(directory, "imported_${stamp.format(LocalDateTime.now())}.zip")
         check(!target.exists()) { "Imported backup archive already exists: ${target.name}" }
@@ -30,5 +30,5 @@ internal object ImportedBackupArchive {
         Files.copy(source.toPath(), temporary.toPath(), REPLACE_EXISTING)
         Files.move(temporary.toPath(), target.toPath(), ATOMIC_MOVE)
         target
-    }.getOrNull()
+    }
 }

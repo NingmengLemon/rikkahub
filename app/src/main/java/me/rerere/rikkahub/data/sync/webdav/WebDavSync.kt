@@ -123,12 +123,12 @@ class WebDavSync(
             includeDatabase = WebDavConfig.BackupItem.DATABASE in config.items,
             includeFiles = WebDavConfig.BackupItem.FILES in config.items,
         )
-        // 本地导入与 WebDAV 导入都从这里进来。只在恢复成功之后留底：失败的归档没有改动任何
+        // 本地导入与 WebDAV 导入都从这里进来。只在恢复成功之后留底：失败的恢复没有改动任何
         // 数据，不需要为它备份，留着只会堆积。放 noBackupFilesDir，filesDir 整个目录被 web
         // 路由暴露，不该放含全库的 zip。
         withContext(Dispatchers.IO) {
-            val archived = ImportedBackupArchive.store(backupFile, File(context.noBackupFilesDir, "imported-backups"))
-            if (archived == null) Log.w(TAG, "Cannot archive imported backup")
+            ImportedBackupArchive.store(backupFile, File(context.noBackupFilesDir, "imported-backups"))
+                .onFailure { Log.w(TAG, "Cannot archive imported backup", it) }
         }
     }
 }

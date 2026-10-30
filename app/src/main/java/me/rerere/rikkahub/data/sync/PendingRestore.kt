@@ -130,6 +130,10 @@ internal class PendingRestore(
             live.walkTopDown().filter { it.isFile }.forEach { file ->
                 val path = prefix + file.relativeTo(live).invariantSeparatorsPath
                 if (path !in kept) {
+                    // 先过一遍 targetFile：不合格的 live 路径要在 journal 落地之前失败。
+                    // 否则 apply 会在搬这条路径时抛 IllegalArgumentException，rollback 对同一条
+                    // 路径再抛一次，最后留下一个每次启动都会崩的 journal。
+                    targetFile(path)
                     removals.add(RestoreEntry(path, install = false, hadOriginal = true))
                 }
             }

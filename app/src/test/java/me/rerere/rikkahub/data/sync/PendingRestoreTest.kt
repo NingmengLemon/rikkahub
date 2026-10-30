@@ -93,11 +93,11 @@ class PendingRestoreTest {
     @Test fun databaseOnlyRestoreKeepsLiveAttachments() = runBlocking {
         write(File(temporary.root, "files/upload/stale"), "stale upload")
         write(database(), "old database")
-        val restore = restore()
-        val staging = restore.createStagingDirectory()
+        val subject = restore()
+        val staging = subject.createStagingDirectory()
         write(File(staging, "payload/database/rikka_hub"), "new database")
         write(File(staging, "settings.json"), "new settings")
-        restore.publish(staging)
+        subject.publish(staging)
         restore().apply { }
         assertEquals("stale upload", File(temporary.root, "files/upload/stale").readText())
     }
@@ -105,11 +105,11 @@ class PendingRestoreTest {
     @Test fun filesOnlyRestoreKeepsAttachmentsMissingFromBackup() = runBlocking {
         write(database(), "old database")
         write(File(temporary.root, "files/upload/stale"), "stale upload")
-        val restore = restore()
-        val staging = restore.createStagingDirectory()
+        val subject = restore()
+        val staging = subject.createStagingDirectory()
         write(File(staging, "payload/files/upload/photo"), "new photo")
         write(File(staging, "settings.json"), "new settings")
-        restore.publish(staging)
+        subject.publish(staging)
         restore().apply { }
         // 库没换，现有库还引用着 live 上的附件，不能删
         assertEquals("stale upload", File(temporary.root, "files/upload/stale").readText())
@@ -119,12 +119,12 @@ class PendingRestoreTest {
     @Test fun nestedAttachmentFolderIsReplacedRecursively() = runBlocking {
         write(File(temporary.root, "files/skills/old/SKILL.md"), "old skill")
         write(database(), "old database")
-        val restore = restore()
-        val staging = restore.createStagingDirectory()
+        val subject = restore()
+        val staging = subject.createStagingDirectory()
         write(File(staging, "payload/database/rikka_hub"), "new database")
         write(File(staging, "payload/files/skills/new/SKILL.md"), "new skill")
         write(File(staging, "settings.json"), "new settings")
-        restore.publish(staging)
+        subject.publish(staging)
         restore().apply { }
         assertFalse(File(temporary.root, "files/skills/old/SKILL.md").exists())
         assertEquals("new skill", File(temporary.root, "files/skills/new/SKILL.md").readText())
@@ -219,11 +219,11 @@ class PendingRestoreTest {
     @Test fun filesOnlyRestoreLeavesDatabaseAndWalUntouched() = runBlocking {
         write(database(), "old database")
         write(File(database().path + "-wal"), "old wal")
-        val restore = restore()
-        val staging = restore.createStagingDirectory()
+        val subject = restore()
+        val staging = subject.createStagingDirectory()
         write(File(staging, "payload/files/fonts/custom.ttf"), "font")
-        restore.publish(staging)
-        restore.apply { error("No settings in backup") }
+        subject.publish(staging)
+        subject.apply { error("No settings in backup") }
         assertEquals("old database", database().readText())
         assertEquals("old wal", File(database().path + "-wal").readText())
         assertEquals("font", File(temporary.root, "files/fonts/custom.ttf").readText())

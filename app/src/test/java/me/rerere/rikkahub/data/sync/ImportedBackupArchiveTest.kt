@@ -3,7 +3,6 @@ package me.rerere.rikkahub.data.sync
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -16,19 +15,16 @@ class ImportedBackupArchiveTest {
     @Test fun storesArchiveAndKeepsContents() {
         val source = File(temporary.root, "backup.zip").apply { writeText("official backup") }
         val directory = File(temporary.root, "imported-backups")
-        val archived = ImportedBackupArchive.store(source, directory)
-        assertNotNull(archived)
-        assertTrue(archived!!.isFile)
+        val archived = ImportedBackupArchive.store(source, directory).getOrThrow()
+        assertTrue(archived.isFile)
         assertEquals("official backup", archived.readText())
     }
 
-    @Test fun keepsPreviousArchivesInsteadOfOverwriting() {
+    @Test fun keepsEveryArchiveInsteadOfOverwriting() {
         val source = File(temporary.root, "backup.zip").apply { writeText("official backup") }
         val directory = File(temporary.root, "imported-backups")
-        val first = ImportedBackupArchive.store(source, directory)
-        val second = ImportedBackupArchive.store(source, directory)
-        assertNotNull(first)
-        assertNotNull(second)
+        val first = ImportedBackupArchive.store(source, directory).getOrThrow()
+        val second = ImportedBackupArchive.store(source, directory).getOrThrow()
         assertNotEquals(first, second)
         assertEquals(2, directory.listFiles()!!.count { it.isFile && it.name.endsWith(".zip") })
     }
@@ -36,12 +32,14 @@ class ImportedBackupArchiveTest {
     @Test fun leavesNoTemporaryFileBehind() {
         val source = File(temporary.root, "backup.zip").apply { writeText("official backup") }
         val directory = File(temporary.root, "imported-backups")
-        ImportedBackupArchive.store(source, directory)
+        ImportedBackupArchive.store(source, directory).getOrThrow()
         assertTrue(directory.listFiles().orEmpty().none { it.name.endsWith(".tmp") })
     }
 
-    @Test fun returnsNullWhenTheSourceIsMissing() {
+    @Test fun reportsFailureWithCauseWhenTheSourceIsMissing() {
         val directory = File(temporary.root, "imported-backups")
-        assertNull(ImportedBackupArchive.store(File(temporary.root, "absent.zip"), directory))
+        val result = ImportedBackupArchive.store(File(temporary.root, "absent.zip"), directory)
+        assertTrue(result.isFailure)
+        assertNotNull(result.exceptionOrNull())
     }
 }
