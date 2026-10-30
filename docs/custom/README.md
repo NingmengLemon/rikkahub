@@ -10,6 +10,7 @@
 | --- | --- |
 | `README.md` | 分支模型、同步流程、定制原则、定制清单、构建与测试环境 |
 | `roadmap.md` | 长期路线：阶段划分、易迁移目标、追更策略、分发与合规 |
+| `importer.md` | 阶段 1 导入器的设计：读取层、版本判定、settings 解析、验收样本、分步计划 |
 
 大的上游同步可以另建一份作业单放在 `upstream/`，合并落地后删除；当前没有作业单，所以那个目录不存在。
 
@@ -161,6 +162,7 @@ git log --oneline master..custom
 | C16 | 清除导出内容里的站点水印 | `ui/pages/chat/ConversationExport.kt`（导出会话图片时左下角不再拼 `rikka-ai.com`，只留时间）、`ui/components/richtext/Mermaid.kt`（导出 Mermaid 图时不再在画布底部绘制站点地址） | 导出的内容是自己生成的，不该带上游站点痕迹 | 只删绘制水印的那几行，图表配色与布局不动，`onBackground` 仍被 mermaid 自身的配置使用。合并注意：上游若再加回水印或其他署名，重新删掉 |
 | C17 | 冻结官方备份的结构快照 | 新增 `data/sync/official/`：`OfficialDatabaseSchema`（14 张表、106 个列、14 个索引、5 个外键、3 处自增）、`OfficialBackupLayout`（归档条目名、为兼容保留的 WAL 侧条目、`launchCount`、四个附件目录与其中两个嵌套目录），以及三个校验测试。配套改动：`BackupManager` 新增 `SETTINGS_ENTRY` 常量并让写入、恢复与 `PendingRestore` 三条路径共用它，另把 `ATTACHMENT_FOLDERS`、`NESTED_ATTACHMENT_FOLDERS`、`LAUNCH_COUNT_KEY` 从 private 放宽到 internal 以便对账 | 导入器和官方兼容导出都需要一份「官方那侧认识什么」的描述，且不能随我们自己的 Room 定义漂，否则一旦我们改结构，导入器就读不懂官方库 | 快照只描述官方那侧，数据从 `app/schemas/.../32.json` 生成。`message_fts*` 这类由手写 SQL 建的全文索引表不在其中：`AppDatabaseFactory` 打开数据库时只保证表存在，索引内容要靠 `ConversationRepository.rebuildAllIndexes` 重建，所以导入完成后要跑一次重建，否则搜索是空的。快照测试与 `32.json` 逐表、逐列、逐索引、逐外键对账，并断言仓库里最高的 Room schema 版本等于快照版本；布局测试与 `BackupManager`、`DatabaseBackup` 的常量对账；settings 测试钉住官方解码器的 `ignoreUnknownKeys` 行为。官方升级会触发版本断言，我们自己改了归档布局会触发布局断言；自家 schema 与官方分叉后版本那条要重做。导入器还没实现，官方兼容导出的骨架由 C18 落地 |
 | C18 | 新增官方兼容的导出出口 | 新增 `BackupTarget`（`SELF` / `OFFICIAL`）、`OfficialDatabaseCompatibility`（判定我们的库还在不在官方形状上，比较版本与 identity hash，配 `OfficialDatabaseCompatibilityTest`）、`OfficialDatabaseAdapter`（一致时原样返回数据库文件，分叉时抛 `OfficialExportUnsupportedException`）；`BackupManager.createBackup` 与 `WebDavSync.prepareBackupFile` 加目标参数，`BackupVM.exportToFile` 透传，只有 `SELF` 会更新备份提醒的时间戳；`ImportExportTab` 的导出分组加第二个入口，与自家导出的区别只在数据库，目标用 `rememberSaveable` 存，避免选择文件期间被回收后退回自家格式；8 个 locale 新增 `backup_page_export_official`、`backup_page_export_official_desc`、`backup_page_export_failed`、`backup_page_export_schema_diverged`；`BackupManagerTest` 补一条官方目标的 androidTest | 改结构之后自家备份官方读不了，需要一个能把数据交回官方的出口；它和自家导出并列，不是把现有导出改掉 | 当前双方 schema 一致，两个出口的产物几乎相同：适配层只做「一致就原样返回、分叉就失败」，裁剪逻辑等真改结构时再补。失败是刻意的，静默产出官方打不开的备份要等到恢复时才发现；分叉走单独的提示文案，技术原因只进日志。导出失败时会尝试删掉选择位置时建出的空文档，尽量不留 0 字节文件（删除本身可能被 provider 拒绝，是 best-effort）。`settings.json` 不裁，官方解码器的 `ignoreUnknownKeys` 会忽略多余字段，这一点由 `OfficialSettingsCompatibilityTest` 钉住。WebDAV 出口暂时只产出 `SELF` 格式。合并注意：上游若改 `createBackup` 的签名或备份页的导出分组，第二个入口要跟着调整 |
+| C19 | 附件按替换语义导入，导入的原始备份留底 | `PendingRestore.buildEntries`（对归档里实际存在的附件目录，为 live 上有、payload 里没有的文件合成 `install = false` 的删除条目，复用现有 journal 与 rollback）；`WebDavSync.restoreFromBackupFile`（在分流之前把原始 zip 复制到 `noBackupFilesDir/imported-backups/`）；`PendingRestoreTest` 补两条 | 导入官方备份时附件是合并不是替换，目标目录里多出来的文件永远留着，启动时 `syncManagedFiles` 还会把它们重新登记进 `managed_files`，技能目录里的旧技能也会被扫到；另外导入完原始 zip 就没了，写坏数据没有回退来源 | 删除条目只用文件级条目，不做目录级 rename：`Files.move` 对非空目录会抛 `DirectoryNotEmptyException`，而 `install = false` 的条目让 apply 把目标移进 `originals/`、rollback 再移回来，现有 journal 一行都不用改。只处理归档里实际带了的目录，只带数据库的备份不会清空 live 附件。归档放 `noBackupFilesDir` 而不是 `filesDir`，后者整个目录被 web 路由暴露。导入器本体仍未实现，见 `importer.md` |
 
 ## 文案与 locale
 

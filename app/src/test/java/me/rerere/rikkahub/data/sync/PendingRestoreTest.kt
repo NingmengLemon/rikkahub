@@ -16,7 +16,9 @@ class PendingRestoreTest {
     @get:Rule val temporary = TemporaryFolder()
 
     private fun restore() = PendingRestore(
-        File(temporary.root, "restore"), database(), File(temporary.root, "files")
+        File(temporary.root, "restore"),
+        database(),
+        File(temporary.root, "files")
     )
 
     private fun database() = File(temporary.root, "databases/rikka_hub")
@@ -59,6 +61,28 @@ class PendingRestoreTest {
         database().writeText("subsequent user changes")
         assertFalse(restore().apply { error("Settings must not be applied again") })
         assertEquals("subsequent user changes", database().readText())
+    }
+
+    @Test fun replacingAttachmentFolderRemovesFilesMissingFromBackup() = runBlocking {
+        write(File(temporary.root, "files/upload/stale"), "stale upload")
+        write(File(temporary.root, "files/skills/old/SKILL.md"), "old skill")
+        stage(restore())
+        restore().apply { }
+        assertEquals("new photo", File(temporary.root, "files/upload/photo").readText())
+        assertFalse(File(temporary.root, "files/upload/stale").exists())
+        // skills 不在备份里，说明归档没带这个目录，不参与替换
+        assertTrue(File(temporary.root, "files/skills/old/SKILL.md").exists())
+    }
+
+    @Test fun failedRestoreRestoresAttachmentsRemovedByReplacement() = runBlocking {
+        write(File(temporary.root, "files/upload/stale"), "stale upload")
+        stage(restore())
+        try {
+            restore().apply { throw IOException("Disk full") }
+            error("Expected failure")
+        } catch (_: RestoreFailedException) {
+            assertEquals("stale upload", File(temporary.root, "files/upload/stale").readText())
+        }
     }
 
     @Test fun failedSettingsWriteRestoresOriginalDatabaseAndSidecarsAndCanRetry() = runBlocking {
