@@ -64,7 +64,7 @@ internal class PendingRestore(
                     if (entry.install) move(source, target)
                 }
             }
-            val settings = File(pending, "settings.json")
+            val settings = File(pending, BackupManager.SETTINGS_ENTRY)
             if (settings.isFile) restoreSettings(settings.readText())
         } catch (e: Exception) {
             try {
@@ -119,8 +119,10 @@ internal class PendingRestore(
             path.startsWith("database/") -> {
                 val name = path.removePrefix("database/")
                 require(name in listOf(
-                    databaseFile.name, databaseFile.name + "-wal",
-                    databaseFile.name + "-shm", databaseFile.name + "-journal"
+                    databaseFile.name,
+                    databaseFile.name + "-wal",
+                    databaseFile.name + "-shm",
+                    databaseFile.name + "-journal"
                 )) {
                     "Invalid restore database path"
                 }
@@ -165,4 +167,6 @@ internal class PendingRestore(
 }
 
 /** Only thrown when original files are intact and the failed import has been isolated. */
-internal class RestoreFailedException(cause: Exception) : Exception("Backup restore failed; original files restored", cause)
+internal class RestoreFailedException(
+    cause: Exception
+) : Exception("Backup restore failed; original files restored", cause)

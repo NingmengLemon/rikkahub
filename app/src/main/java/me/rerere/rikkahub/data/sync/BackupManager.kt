@@ -134,7 +134,7 @@ class BackupManager(
                             currentCoroutineContext().ensureActive()
                             if (entry.isDirectory) continue
                             val target = when (entry.name) {
-                                "settings.json" -> File(staging, "settings.json")
+                                SETTINGS_ENTRY -> File(staging, SETTINGS_ENTRY)
                                 DatabaseBackup.ARCHIVE_DATABASE -> if (includeDatabase) stagedDatabase else null
                                 DatabaseBackup.WAL -> if (includeDatabase) stagedWal else null
                                 DatabaseBackup.SHM -> null // Rebuilt by SQLite; never restore shared-memory state.
@@ -171,7 +171,7 @@ class BackupManager(
                         DatabaseBackup.removeSidecars(stagedDatabase)
                     }
 
-                    val settingsFile = File(staging, "settings.json")
+                    val settingsFile = File(staging, SETTINGS_ENTRY)
                     if (settingsFile.exists()) {
                         val migrated = SettingsJsonMigrator.migrate(settingsFile.readText())
                         val settings = json.decodeFromString<Settings>(migrated)

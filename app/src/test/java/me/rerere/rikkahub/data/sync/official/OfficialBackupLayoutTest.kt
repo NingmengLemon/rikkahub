@@ -49,7 +49,7 @@ class OfficialBackupLayoutTest {
     }
 
     @Test
-    fun `合法形状的附件条目按目录归类`() {
+    fun `well formed attachment entries are classified by folder`() {
         assertTrue(OfficialBackupLayout.isAttachmentEntry("upload/a.png"))
         assertTrue(OfficialBackupLayout.isAttachmentEntry("fonts/Noto.ttf"))
         assertTrue(OfficialBackupLayout.isAttachmentEntry("skills/demo/SKILL.md"))
@@ -57,7 +57,7 @@ class OfficialBackupLayoutTest {
     }
 
     @Test
-    fun `非法形状的条目与恢复侧一样被拒绝`() {
+    fun `malformed entries are rejected the same way the restore side does`() {
         // 没有斜杠：不是某个目录下的文件
         assertFalse(OfficialBackupLayout.isAttachmentEntry("upload"))
         // 相对路径为空
@@ -69,5 +69,12 @@ class OfficialBackupLayoutTest {
         // 顶层条目
         assertFalse(OfficialBackupLayout.isAttachmentEntry("settings.json"))
         assertFalse(OfficialBackupLayout.isAttachmentEntry("rikka_hub.db"))
+    }
+
+    @Test
+    fun `path traversal is left to the caller`() {
+        // 快照只按目录归类，不做路径穿越检查；导入器拿到条目后仍必须走 PendingRestore.resolveInside，
+        // 那里才会拒绝 ".."、反斜杠与控制字符。这条测试把职责边界固定下来。
+        assertTrue(OfficialBackupLayout.isAttachmentEntry("skills/../escape.txt"))
     }
 }

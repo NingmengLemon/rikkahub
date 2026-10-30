@@ -7,6 +7,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -23,17 +24,27 @@ class OfficialDatabaseSchemaTest {
 
     @Test
     fun `repo schema version matches the snapshot version`() {
-        // 自家 schema 一旦与官方分叉，这条断言就要重做：那时 app/schemas 下最高的版本不再
-        // 等于官方版本，得改成对着官方仓库的 schema 或一份手工维护的版本号。
+        assertTrue("找不到 ${schemaDir.absolutePath}", schemaDir.isDirectory)
+
         val highest = schemaDir.listFiles()
             ?.mapNotNull { it.name.removeSuffix(".json").toIntOrNull() }
             ?.maxOrNull()
+            ?: throw AssertionError("${schemaDir.absolutePath} 里没有可识别的版本文件")
 
-        assertEquals(
-            "仓库里的 Room schema 已经超过快照版本，官方升级后需要同步更新 OfficialDatabaseSchema",
-            OfficialDatabaseSchema.VERSION,
-            highest,
-        )
+        // 两条分开报，读的人才知道该往哪个方向查：快照超前说明抄错了来源，落后说明官方升了版本。
+        if (highest < OfficialDatabaseSchema.VERSION) {
+            throw AssertionError(
+                "快照版本 v${OfficialDatabaseSchema.VERSION} 高于仓库里的 Room schema v$highest，" +
+                    "快照可能对着更新的官方版本写的。检查 schema 来源。"
+            )
+        }
+        if (highest > OfficialDatabaseSchema.VERSION) {
+            throw AssertionError(
+                "仓库里的 Room schema 已经到 v$highest，快照还停在 v${OfficialDatabaseSchema.VERSION}。" +
+                    "官方升级时同步更新快照；如果是我们自己升的版本，这条断言要改成对着官方来源校验，" +
+                    "而不是对着 app/schemas。"
+            )
+        }
     }
 
     @Test
@@ -86,6 +97,10 @@ class OfficialDatabaseSchemaTest {
                     json.getValue("columnNames").jsonArray.map { it.jsonPrimitive.content },
                     index.columns,
                 )
+                assertEquals(
+                    json["orders"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty(),
+                    index.orders,
+                )
             }
 
             val foreignKeys = entity["foreignKeys"]?.jsonArray?.map { it.jsonObject }.orEmpty()
@@ -101,6 +116,7 @@ class OfficialDatabaseSchemaTest {
                     foreignKey.referencedColumns,
                 )
                 assertEquals(json.getValue("onDelete").jsonPrimitive.content, foreignKey.onDelete)
+                assertEquals(json.getValue("onUpdate").jsonPrimitive.content, foreignKey.onUpdate)
             }
         }
     }

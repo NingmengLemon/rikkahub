@@ -12,7 +12,9 @@ package me.rerere.rikkahub.data.sync.official
  *
  * 数据来自 app/schemas/me.rerere.rikkahub.data.db.AppDatabase/32.json。官方库里还有
  * `message_fts` 这类由手写 SQL 建的全文索引表，它们不在 Room 的 schema 里，也不在这份
- * 快照里：那是派生数据，`AppDatabaseFactory` 每次打开都会重建，导入时忽略即可。
+ * 快照里。那是派生数据：`AppDatabaseFactory` 打开数据库时只保证表存在，索引内容要靠
+ * [me.rerere.rikkahub.data.repository.ConversationRepository.rebuildAllIndexes] 重建，
+ * 所以导入完成后要跑一次重建，否则搜索会是空的。
  */
 internal object OfficialDatabaseSchema {
     const val VERSION = 32
@@ -71,7 +73,8 @@ internal object OfficialDatabaseSchema {
                     table = "ConversationEntity",
                     columns = listOf("conversation_id"),
                     referencedColumns = listOf("id"),
-                    onDelete = "CASCADE"
+                    onDelete = "CASCADE",
+                    onUpdate = "NO ACTION"
                 ),
             ),
         ),
@@ -103,14 +106,20 @@ internal object OfficialDatabaseSchema {
                 Column("select_index", "INTEGER", notNull = true),
             ),
             indices = listOf(
-                Index("index_message_node_conversation_id", unique = false, columns = listOf("conversation_id")),
+                Index(
+                    "index_message_node_conversation_id",
+                    unique = false,
+                    columns = listOf("conversation_id"),
+                    orders = listOf()
+                ),
             ),
             foreignKeys = listOf(
                 ForeignKey(
                     table = "ConversationEntity",
                     columns = listOf("conversation_id"),
                     referencedColumns = listOf("id"),
-                    onDelete = "CASCADE"
+                    onDelete = "CASCADE",
+                    onUpdate = "NO ACTION"
                 ),
             ),
         ),
@@ -129,8 +138,13 @@ internal object OfficialDatabaseSchema {
                 Column("updated_at", "INTEGER", notNull = true),
             ),
             indices = listOf(
-                Index("index_managed_files_relative_path", unique = true, columns = listOf("relative_path")),
-                Index("index_managed_files_folder", unique = false, columns = listOf("folder")),
+                Index(
+                    "index_managed_files_relative_path",
+                    unique = true,
+                    columns = listOf("relative_path"),
+                    orders = listOf()
+                ),
+                Index("index_managed_files_folder", unique = false, columns = listOf("folder"), orders = listOf()),
             ),
             foreignKeys = listOf(),
         ),
@@ -149,9 +163,9 @@ internal object OfficialDatabaseSchema {
                 Column("updated_at", "INTEGER", notNull = true),
             ),
             indices = listOf(
-                Index("index_favorites_ref_key", unique = true, columns = listOf("ref_key")),
-                Index("index_favorites_type", unique = false, columns = listOf("type")),
-                Index("index_favorites_created_at", unique = false, columns = listOf("created_at")),
+                Index("index_favorites_ref_key", unique = true, columns = listOf("ref_key"), orders = listOf()),
+                Index("index_favorites_type", unique = false, columns = listOf("type"), orders = listOf()),
+                Index("index_favorites_created_at", unique = false, columns = listOf("created_at"), orders = listOf()),
             ),
             foreignKeys = listOf(),
         ),
@@ -173,8 +187,8 @@ internal object OfficialDatabaseSchema {
                 Column("ssh_config", "TEXT", notNull = false),
             ),
             indices = listOf(
-                Index("index_workspaces_root", unique = true, columns = listOf("root")),
-                Index("index_workspaces_updated_at", unique = false, columns = listOf("updated_at")),
+                Index("index_workspaces_root", unique = true, columns = listOf("root"), orders = listOf()),
+                Index("index_workspaces_updated_at", unique = false, columns = listOf("updated_at"), orders = listOf()),
             ),
             foreignKeys = listOf(),
         ),
@@ -190,7 +204,12 @@ internal object OfficialDatabaseSchema {
                 Column("create_at", "INTEGER", notNull = true),
             ),
             indices = listOf(
-                Index("index_conversation_folder_assistant_id", unique = false, columns = listOf("assistant_id")),
+                Index(
+                    "index_conversation_folder_assistant_id",
+                    unique = false,
+                    columns = listOf("assistant_id"),
+                    orders = listOf()
+                ),
             ),
             foreignKeys = listOf(),
         ),
@@ -219,14 +238,20 @@ internal object OfficialDatabaseSchema {
                 Column("create_at", "INTEGER", notNull = true),
             ),
             indices = listOf(
-                Index("index_media_creation_node_session_id", unique = false, columns = listOf("session_id")),
+                Index(
+                    "index_media_creation_node_session_id",
+                    unique = false,
+                    columns = listOf("session_id"),
+                    orders = listOf()
+                ),
             ),
             foreignKeys = listOf(
                 ForeignKey(
                     table = "media_creation_session",
                     columns = listOf("session_id"),
                     referencedColumns = listOf("id"),
-                    onDelete = "CASCADE"
+                    onDelete = "CASCADE",
+                    onUpdate = "NO ACTION"
                 ),
             ),
         ),
@@ -253,21 +278,33 @@ internal object OfficialDatabaseSchema {
                 Column("update_at", "INTEGER", notNull = true),
             ),
             indices = listOf(
-                Index("index_media_creation_record_session_id", unique = false, columns = listOf("session_id")),
-                Index("index_media_creation_record_node_id", unique = false, columns = listOf("node_id")),
+                Index(
+                    "index_media_creation_record_session_id",
+                    unique = false,
+                    columns = listOf("session_id"),
+                    orders = listOf()
+                ),
+                Index(
+                    "index_media_creation_record_node_id",
+                    unique = false,
+                    columns = listOf("node_id"),
+                    orders = listOf()
+                ),
             ),
             foreignKeys = listOf(
                 ForeignKey(
                     table = "media_creation_session",
                     columns = listOf("session_id"),
                     referencedColumns = listOf("id"),
-                    onDelete = "CASCADE"
+                    onDelete = "CASCADE",
+                    onUpdate = "NO ACTION"
                 ),
                 ForeignKey(
                     table = "media_creation_node",
                     columns = listOf("node_id"),
                     referencedColumns = listOf("id"),
-                    onDelete = "CASCADE"
+                    onDelete = "CASCADE",
+                    onUpdate = "NO ACTION"
                 ),
             ),
         ),
@@ -284,7 +321,12 @@ internal object OfficialDatabaseSchema {
                 Column("create_at", "INTEGER", notNull = true),
             ),
             indices = listOf(
-                Index("index_translation_history_create_at", unique = false, columns = listOf("create_at")),
+                Index(
+                    "index_translation_history_create_at",
+                    unique = false,
+                    columns = listOf("create_at"),
+                    orders = listOf()
+                ),
             ),
             foreignKeys = listOf(),
         ),
@@ -306,7 +348,12 @@ internal object OfficialDatabaseSchema {
                 Column("cached_tokens", "INTEGER", notNull = true),
             ),
             indices = listOf(
-                Index("index_usage_record_created_at", unique = false, columns = listOf("created_at")),
+                Index(
+                    "index_usage_record_created_at",
+                    unique = false,
+                    columns = listOf("created_at"),
+                    orders = listOf()
+                ),
             ),
             foreignKeys = listOf(),
         ),
@@ -332,6 +379,7 @@ internal object OfficialDatabaseSchema {
         val name: String,
         val unique: Boolean,
         val columns: List<String>,
+        val orders: List<String>,
     )
 
     data class ForeignKey(
@@ -339,5 +387,6 @@ internal object OfficialDatabaseSchema {
         val columns: List<String>,
         val referencedColumns: List<String>,
         val onDelete: String,
+        val onUpdate: String,
     )
 }
