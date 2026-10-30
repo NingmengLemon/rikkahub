@@ -173,7 +173,7 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 1. 读取层：先定 fixture 与期望值（行数、列集合、内容 hash，由独立脚本算出），再写 reader，用 androidTest 跑。
 2. 版本判定与分流：接到 `restoreFromBackupFile`。
 3. 写入：行数据 → 新建 Room 库 → 校验能打开且各表 hash 与期望值一致。
-4. settings 形状校验。附件替换与归档已经在共用入口落地，导入器分支复用它们，不再做一遍。
+4. settings 形状校验。附件替换天然复用（共用 `PendingRestore.buildEntries`）；归档要跟着分流走：现在的归档调用在 `stageRestore` 之后，导入器分支不走那条路，得把调用上移成两条分支共用，或在导入器分支里再调一次。
 5. 验收。
 
 现在先做的两项不依赖上面任何一步，都已经落地：

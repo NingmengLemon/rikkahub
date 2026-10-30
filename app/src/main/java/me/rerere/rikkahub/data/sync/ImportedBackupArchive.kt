@@ -21,7 +21,7 @@ internal object ImportedBackupArchive {
      *
      * 先写临时文件再原子改名，进程中途被杀不会留下截断的归档；文件名带毫秒，同一秒内多次
      * 导入不会互相覆盖。不覆盖已有文件：宁可多出一份，也不要悄悄替换掉上一份。
-     * 失败时会把临时文件删掉，不在目录里留残渣。
+     * 失败时会尝试删掉临时文件，不在目录里留残渣（删除本身可能失败，是 best-effort）。
      */
     fun store(source: File, directory: File): Result<File> = runCatching {
         check(directory.isDirectory || directory.mkdirs()) { "Cannot create archive directory" }
