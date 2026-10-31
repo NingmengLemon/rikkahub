@@ -44,10 +44,10 @@ internal class OfficialDatabaseConverter(
     }
 
     /**
-     * 快照里有、目标库没有的列直接拒绝，不要等到插入时才报错。
+     * 快照里有、目标库没有的表或列一律拒绝，不要等到插入时才报错。
      *
      * 官方升版通常就是加列（v31 到 v32 加了 `workspaces.type` 与 `workspaces.ssh_config`），
-     * 所以这个检查在「源比我们新」时必然触发；那种情况本来就该明确失败，而不是写一半再崩。
+     * 分叉之后我们这边删表或改表名也会走到这里；两种情况都该明确失败，而不是写一半再崩。
      */
     private fun requireTargetCoversSnapshot(
         database: androidx.sqlite.db.SupportSQLiteDatabase,
@@ -57,7 +57,9 @@ internal class OfficialDatabaseConverter(
             val live = database.query("PRAGMA table_info(`$name`)").use { cursor ->
                 buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
             }
-            if (live.isEmpty()) continue
+            check(live.isNotEmpty()) {
+                "官方表 $name 在本应用里没有对应的表，无法直接转换"
+            }
             val missing = table.columns.map { it.name }.filter { it !in live }
             check(missing.isEmpty()) {
                 "官方表 $name 有本应用还不认识的列 ${missing.joinToString()}，无法直接转换"

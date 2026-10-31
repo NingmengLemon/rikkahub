@@ -21,6 +21,7 @@ import me.rerere.rikkahub.data.db.entity.ConversationEntity
 import me.rerere.rikkahub.data.db.entity.MessageNodeEntity
 import me.rerere.rikkahub.data.db.fts.MessageFtsManager
 import me.rerere.rikkahub.data.db.fts.MessageSearchSort
+import me.rerere.rikkahub.data.db.fts.SearchIndexHealth
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.MessageNode
@@ -315,8 +316,10 @@ class ConversationRepository(
      * 启动时用它决定要不要重建：备份恢复会换掉整个库、索引搬不过来；全量重建中途被杀也会
      * 留下空的索引，而重建的第一步就是清空，所以「空」与「残缺」一样要重来。
      */
-    suspend fun needsSearchIndexRebuild(): Boolean =
-        countConversations() > 0 && messageFtsManager.isEmpty()
+    suspend fun needsSearchIndexRebuild(): Boolean = SearchIndexHealth.needsRebuild(
+        conversationCount = countConversations(),
+        indexIsEmpty = messageFtsManager.isEmpty(),
+    )
 
     suspend fun countConversationsByAssistant(): Map<Uuid, Int> {
         return conversationDAO.countByAssistant().mapNotNull { row ->
