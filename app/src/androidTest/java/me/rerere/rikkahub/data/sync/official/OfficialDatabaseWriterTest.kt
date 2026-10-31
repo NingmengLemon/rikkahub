@@ -76,6 +76,46 @@ class OfficialDatabaseWriterTest {
         }
     }
 
+    /**
+     * 带外键的两张表一起搬，顺便验证 JSON 字段原样不动。
+     *
+     * 只写 workspaces（无外键）的实现在前一条测试里也能通过，这条才真正踩到「父表先插」。
+     */
+    @Test fun roundTripsForeignKeyRowsAndRawJson() {
+        val messages = """[{"id":"a1","role":"USER","parts":[{"type":"text","text":"你好"}]}]"""
+        val source = appDatabase("fk-source.db") { database ->
+            database.execSQL(
+                "INSERT INTO ConversationEntity (id, title, nodes, create_at, update_at) " +
+                    "VALUES ('c1', 'demo', '[]', 1, 2)"
+            )
+            database.execSQL(
+                "INSERT INTO message_node (id, conversation_id, node_index, messages, select_index) " +
+                    "VALUES ('m1', 'c1', 0, ?, 3)",
+                arrayOf(messages),
+            )
+        }
+
+        val target = rawDatabase("fk-target.db")
+        val room = AppDatabaseFactory.create(context, target.absolutePath)
+        try {
+            OfficialDatabaseReader.open(source).use { reader ->
+                assertEquals(2, OfficialDatabaseWriter(room.openHelper.writableDatabase).write(reader))
+            }
+        } finally {
+            room.close()
+        }
+
+        OfficialDatabaseReader.open(target).use { reader ->
+            val node = reader.rows("message_node").single()
+            assertEquals("m1", node.string("id"))
+            assertEquals("c1", node.string("conversation_id"))
+            assertEquals(0L, node.long("node_index"))
+            assertEquals(3L, node.long("select_index"))
+            assertEquals("JSON 字段必须逐字节原样搬运", messages, node.string("messages"))
+            assertEquals("c1", reader.rows("ConversationEntity").single().string("id"))
+        }
+    }
+
     /** 用应用自己的 schema 建一个库，可选地往里写点数据 */
     private fun appDatabase(name: String, prepare: (androidx.sqlite.db.SupportSQLiteDatabase) -> Unit = {}): File {
         val file = rawDatabase(name)
