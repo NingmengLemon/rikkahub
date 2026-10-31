@@ -123,16 +123,28 @@ fun SettingFilesPage(
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text(stringResource(R.string.setting_files_page_delete_file_title)) },
-            text = { Text(target.displayName) },
+            text = {
+                Text(
+                    target.displayName + "\n\n" +
+                        "附件按内容只存一份，同一个文件可能同时被多条消息、助手头像或收藏引用。" +
+                        "确认后会先查一遍引用：已经没人用时连磁盘文件一起删掉；还有引用时只把它从" +
+                        "这个列表里移除，文件保留。"
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
                         scope.launch {
-                            val ok = filesManager.delete(target.id)
-                            if (ok) {
-                                toaster.show(deletedToast)
-                            } else {
-                                toaster.show(deleteFailedToast)
+                            val relativePath = target.relativePath
+                            val outcome = runCatching {
+                                attachmentCleanup.deleteIfUnreferenced(relativePath)
+                            }.getOrNull()
+                            val removed = filesManager.delete(target.id)
+                            when {
+                                outcome == null -> toaster.show(deleteFailedToast)
+                                outcome == AttachmentCleanup.Outcome.DELETED -> toaster.show(deletedToast)
+                                !removed -> toaster.show(deleteFailedToast)
+                                else -> toaster.show("还有地方引用这个附件，已从列表移除、文件保留")
                             }
                             pendingDelete = null
                         }
@@ -164,13 +176,18 @@ fun SettingFilesPage(
                 onClean = {
                     showCleanSheet = false
                     scope.launch {
+                        // 去重之后同一份内容可能被多处引用，按时间批量删会删到别处在用的文件，
+                        // 而且 createdAt 现在是「这份内容第一次出现」，不再等于「很久没用」。
+                        // 这里只从列表移除，磁盘文件与空间回收交给逐个删除与扫描入口。
                         val ok = selectedCleanRange.days?.let { days ->
                             filesManager.deleteOlderThan(
                                 folder = selectedFolder,
                                 cutoffMillis = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(days.toLong()),
                             )
                         } ?: filesManager.deleteAll(selectedFolder)
-                        toaster.show(if (ok) cleanedToast else cleanFailedToast)
+                        toaster.show(
+                            if (ok) "已从列表移除，磁盘文件未删除" else cleanFailedToast
+                        )
                     }
                 },
             )

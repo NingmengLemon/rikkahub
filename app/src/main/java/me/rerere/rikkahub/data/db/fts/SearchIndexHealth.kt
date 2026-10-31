@@ -13,6 +13,6 @@ internal object SearchIndexHealth {
      * @param conversationCount 会话表里的条数
      * @param indexIsEmpty 索引里有没有内容
      */
-    fun needsRebuild(conversationCount: Int, indexIsEmpty: Boolean): Boolean =
-        conversationCount > 0 && indexIsEmpty
+    fun needsRebuild(conversationCount: Int, indexIsEmpty: Boolean, rebuildComplete: Boolean): Boolean =
+        conversationCount > 0 && (indexIsEmpty || !rebuildComplete)
 }

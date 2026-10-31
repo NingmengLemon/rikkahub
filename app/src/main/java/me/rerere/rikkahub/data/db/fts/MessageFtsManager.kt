@@ -51,6 +51,8 @@ internal fun createMessageFtsTables(db: SupportSQLiteDatabase) {
     )
     val hasRowidTable = db.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'message_fts_rowid'")
         .use { it.moveToFirst() }
+    // 状态表要在早退之前建，否则老安装永远不会有它
+    db.execSQL("CREATE TABLE IF NOT EXISTS message_fts_state(state_key TEXT PRIMARY KEY, state_value TEXT NOT NULL)")
     if (hasRowidTable) return
     db.beginTransaction()
     try {
@@ -142,6 +144,33 @@ class MessageFtsManager(private val database: AppDatabase) {
         database.openHelper.readableDatabase.query("SELECT COUNT(*) FROM message_fts_rowid").use {
             it.moveToFirst() && it.getInt(0) == 0
         }
+    }
+
+    /**
+     * 上一次全量重建有没有跑完。
+     *
+     * 只靠「索引非空」发现不了残缺：重建是「先清空再逐会话写」，写完第一张就被杀的话索引非空
+     * 但缺内容，搜索会永久少一部分。所以重建开始时记一个「跑过」标记，成功收尾才改成「完整」。
+     */
+    suspend fun isRebuildComplete(): Boolean = withContext(Dispatchers.IO) {
+        database.openHelper.readableDatabase
+            .query("SELECT state_value FROM message_fts_state WHERE state_key = 'rebuild_complete'").use {
+                it.moveToFirst() && it.getString(0) == "1"
+            }
+    }
+
+    /** 重建开始：标记为未完成，中途被杀就会被下次启动的自检发现 */
+    suspend fun markRebuildStarted() = withContext(Dispatchers.IO) {
+        database.openHelper.writableDatabase.execSQL(
+            "INSERT OR REPLACE INTO message_fts_state(state_key, state_value) VALUES ('rebuild_complete', '0')"
+        )
+    }
+
+    /** 重建收尾：标记为完整 */
+    suspend fun markRebuildFinished() = withContext(Dispatchers.IO) {
+        database.openHelper.writableDatabase.execSQL(
+            "INSERT OR REPLACE INTO message_fts_state(state_key, state_value) VALUES ('rebuild_complete', '1')"
+        )
     }
 
     suspend fun search(

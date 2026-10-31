@@ -319,6 +319,7 @@ class ConversationRepository(
     suspend fun needsSearchIndexRebuild(): Boolean = SearchIndexHealth.needsRebuild(
         conversationCount = countConversations(),
         indexIsEmpty = messageFtsManager.isEmpty(),
+        rebuildComplete = messageFtsManager.isRebuildComplete(),
     )
 
     suspend fun countConversationsByAssistant(): Map<Uuid, Int> {
@@ -377,6 +378,7 @@ class ConversationRepository(
         messageFtsManager.search(keyword, MessageSearchSort.RELEVANCE, assistantIds.map { it.toString() })
 
     suspend fun rebuildAllIndexes(onProgress: (current: Int, total: Int) -> Unit = { _, _ -> }) {
+        messageFtsManager.markRebuildStarted()
         messageFtsManager.deleteAll()
         val allIds = conversationDAO.getAllIds()
         val total = allIds.size
