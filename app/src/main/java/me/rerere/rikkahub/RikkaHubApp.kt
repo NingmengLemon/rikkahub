@@ -104,10 +104,12 @@ class RikkaHubApp : Application() {
         // sync upload files to DB
         syncManagedFiles()
 
-        // 备份恢复换掉的是一个全新的库，全文索引是派生数据、库里是空的；不重建就搜不到东西。
-        // 只在这一步做，因为正常启动时索引本来就在。
+        // 备份恢复换掉的是一个全新的库，全文索引是派生数据、库里是空的；全量重建中途被杀也会
+        // 留下空的索引（重建第一步就是清空）。两种情况都靠启动自检兜住：有会话但索引为空就重建。
         if (restored) {
             rebuildSearchIndexes()
+        } else {
+            rebuildSearchIndexesIfMissing()
         }
 
         // Extract builtin skills from assets after install/update
@@ -197,6 +199,26 @@ class RikkaHubApp : Application() {
                 Log.i(TAG, "Rebuilt search indexes after restore")
             }.onFailure {
                 Log.e(TAG, "Failed to rebuild search indexes after restore", it)
+            }
+        }
+    }
+
+    /**
+     * 常规启动时的自检：有会话但索引为空就重建。
+     *
+     * 覆盖两种留下空索引的情况：恢复被中断（索引没建成），以及全量重建中途被杀（它开头就是
+     * 清空）。正常启动时索引本来就在，这里只是一次计数查询。
+     */
+    private fun rebuildSearchIndexesIfMissing() {
+        get<AppScope>().launch(Dispatchers.IO) {
+            runCatching {
+                val repository = get<ConversationRepository>()
+                if (repository.needsSearchIndexRebuild()) {
+                    Log.i(TAG, "Search index is empty while conversations exist, rebuilding")
+                    repository.rebuildAllIndexes()
+                }
+            }.onFailure {
+                Log.e(TAG, "Search index self-check failed", it)
             }
         }
     }

@@ -1,7 +1,9 @@
 package me.rerere.rikkahub.data.sync.official
 
+import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
@@ -31,6 +33,8 @@ class OfficialSampleAcceptanceTest {
     private data class Case(val version: Int, val sample: File, val expectations: File) {
         val present: Boolean get() = sample.isFile && expectations.isFile
     }
+
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     private val cases = listOf(
         Case(
@@ -98,6 +102,76 @@ class OfficialSampleAcceptanceTest {
         }
     }
 
+    /**
+     * 转换产物要与同一份期望值对得上。
+     *
+     * 这一步才是「导入器真的搬对了数据」的判据：读取层对得上只说明能读，转换器与写入层
+     * 走的是另一条路（新建库、按快照列插入、重写附件路径），写错列内容但行数对不会在这里混过去。
+     */
+    @Test fun theConvertedDatabaseMatchesTheSameDigests() {
+        val available = cases.filter { it.present }
+        assumeTrue("没有放样本或期望值，跳过", available.isNotEmpty())
+        val filesUriPrefix = context.filesDir.toUri().toString().trimEnd('/') + "/"
+        available.forEach { case ->
+            val expected = Json.parseToJsonElement(case.expectations.readText()).jsonObject
+            val target = File(context.cacheDir, "acceptance-v${case.version}.db")
+            target.delete()
+            target.parentFile?.mkdirs()
+            runBlocking { OfficialDatabaseConverter(context).convert(case.sample, target) }
+            try {
+                OfficialDatabaseReader.open(target).use { reader ->
+                    assertEquals("转换结果应当是当前版本", OfficialDatabaseSchema.VERSION, reader.snapshot.version)
+                    assertTrue("转换结果不应有快照之外的列", reader.unexpectedColumns.isEmpty())
+                    // 转换产物是当前版本的结构，源版本没有的列不参与比对：这里按**源版本**的列
+                    // 集合算摘要，语义是「源里有的每一列都原样搬过来了」。
+                    val sourceTables = requireNotNull(OfficialSnapshots.forVersion(case.version)) {
+                        "没有 v${case.version} 的官方快照"
+                    }.tables
+                    val tables = expected.getValue("tables").jsonObject
+                    for ((name, raw) in tables) {
+                        val entry = raw.jsonObject
+                        val table = requireNotNull(sourceTables[name]) { "源快照里没有表 $name" }
+                        val expectedRows = entry.getValue("rows").jsonPrimitive.long
+                        val expectedDigest = entry.getValue("sha256").jsonPrimitive.content
+                        val pkIndex = table.primaryKey.map { key -> table.columns.indexOfFirst { it.name == key } }
+                        val collected = ArrayList<Pair<List<Any?>, ByteArray>>()
+                        var foreignPrefix = 0
+                        reader.forEachRow(name) { row ->
+                            val cells = ByteArrayOutputStream()
+                            for (column in table.columns) {
+                                val value = row.value(column.name)
+                                if (value is String && VALUE_PREFIX.containsMatchIn(value) &&
+                                    !value.contains(filesUriPrefix)
+                                ) {
+                                    foreignPrefix++
+                                }
+                                writeCell(cells, value)
+                            }
+                            collected.add(pkIndex.map { row.value(table.columns[it].name) } to cells.toByteArray())
+                        }
+                        collected.sortWith { left, right -> compareKeys(left.first, right.first) }
+                        val digest = MessageDigest.getInstance("SHA-256")
+                        var first = true
+                        for ((_, cells) in collected) {
+                            if (!first) digest.update(0x1e.toByte())
+                            first = false
+                            digest.update(cells)
+                        }
+                        assertEquals("v${case.version} 表 $name 转换后的行数", expectedRows, collected.size.toLong())
+                        assertEquals(
+                            "v${case.version} 表 $name 转换后的内容摘要",
+                            expectedDigest,
+                            digest.digest().joinToString("") { "%02x".format(it) },
+                        )
+                        assertEquals("v${case.version} 表 $name 还有指向别的安装的附件路径", 0, foreignPrefix)
+                    }
+                }
+            } finally {
+                target.delete()
+            }
+        }
+    }
+
     /** SQLite 的排序：NULL < 数字 < 文本 */
     private fun compareKeys(left: List<Any?>, right: List<Any?>): Int {
         for (index in left.indices) {
@@ -115,6 +189,11 @@ class OfficialSampleAcceptanceTest {
         return 0
     }
 
+    /** 附件引用的绝对前缀在导入时会被换成本机路径，校验内容时统一成占位符 */
+    private val VALUE_PREFIX = Regex("""file:///data/(?:user/\d+|data)/[^/"\s]+/files/""")
+
+    private val VALUE_PREFIX_PLACEHOLDER = "file://<files>/"
+
     /** 与 `tools/backup-expectations.py` 的规范化逐字节一致：类型字节 + 4 字节小端长度 + 载荷 */
     private fun writeCell(sink: ByteArrayOutputStream, value: Any?) {
         val payload: ByteArray = when (value) {
@@ -125,7 +204,7 @@ class OfficialSampleAcceptanceTest {
                 ByteArray(8) { index -> (bits ushr (56 - index * 8)).toByte() }
             }
 
-            is String -> value.toByteArray()
+            is String -> VALUE_PREFIX.replace(value, VALUE_PREFIX_PLACEHOLDER).toByteArray()
             is ByteArray -> value
             else -> error("未知的列值类型：${value::class}")
         }

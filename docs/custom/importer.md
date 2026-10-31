@@ -78,7 +78,7 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 这一节已经落地（C20）：`data/sync/official/OfficialDatabaseReader` 提供只读访问，打开时用 `PRAGMA table_info` 与 `user_version` 核对结构，结构与类型判断抽在 `OfficialSchemaVerifier` 里，不依赖 Android，可以直接跑 JVM 测试。
 
 - `SQLiteDatabase.openDatabase(..., OPEN_READONLY)` 打开。不跑 integrity_check，那是 `DatabaseBackup.normalize` 的职责；导入器在解压后先调一次 `normalize` 把 `-wal` 合进去，再读。
-- 不加载 Room、不引用本仓库的 `@Entity`，表名列名全部来自 `OfficialDatabaseSchema`。
+- 不加载 Room、不引用本仓库的 `@Entity`，表名列名按库里的 `user_version` 从 `OfficialSnapshots` 选版本快照。
 - 只读业务表，`message_fts*` 跳过。
 - 逐行迭代，不 materialize：每张表产出 `Sequence<OfficialRow>`。`OfficialRow` 携带表名与列值，列值按 affinity 在读取时转成确定的类型，行对象不依赖 cursor。读取时校验：快照里有、库里没有的列失败；类型与快照冲突失败；表缺失失败；库里多出来的列忽略并记日志。
 - 附件目录与嵌套规则引用 `OfficialBackupLayout`，不要在这里重列一遍。
@@ -93,7 +93,7 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 - `message_node` 的 `node_index`、`select_index` 与 id 原样保留。`ConversationEntity.nodes` 是遗留空列（v12 起恒为 `"[]"`，树在 `message_node` 里），照抄即可。
 - 自增表（`GenMediaEntity`、`managed_files`、`usage_record`）显式写 id；SQLite 会自己把 `sqlite_sequence` 提到显式 id 之上。
 - JSON 字段（`UIMessage`、`config`、`toolApprovals` 等）原样搬运，不解析再序列化。解析会丢未知字段，也会把官方的格式变化变成我们这边的转换错误。
-- 附件引用是绝对 `file://` URI，包名在路径里。写入文本列前要把 `file:///data/(user|data)/<任意>/<任意包名>/files/` 前缀换成当前应用的 files 目录，否则导入到改过包名的应用后附件全部失配。真实样本里有 9080 处消息引用、11 个助手头像、1 个用户头像用的是这个形式。只认这一种形状，不绑定包名；JSON 整段做字符串替换，不解析。等附件引用改成相对形式之后，这一步对自家归档不再需要，但官方备份进来的方向仍然是绝对路径，重写要一直保留。
+- 附件引用是绝对 `file://` URI，包名在路径里。写入文本列前要把 `file:///data/(user|data)/<任意>/<任意包名>/files/` 前缀换成当前应用的 files 目录，否则导入到改过包名的应用后附件全部失配。真实样本里有 9080 处消息引用用的是这个形式；助手头像与用户头像在 `settings.json` 里，方向相同但重写发生在 settings 分支。只认这一种形状，不绑定包名；JSON 整段做字符串替换，不解析。等附件引用改成相对形式之后，这一步对自家归档不再需要，但官方备份进来的方向仍然是绝对路径，重写要一直保留。
 - 快照里有、我们当前的 `@Entity` 没有的列：拒绝导入这一版，不按默认值硬填。转换器在动手写之前就做这项对账，缺列时给出明确信息而不是让插入失败。
 - 字段级语义：每个支持的官方版本带一份映射表，逐列写清「直接照抄」还是「需要转换」，并配一条完整性测试，保证表里覆盖了该版本快照的每一列。分叉之后只改这张表，不改读取层。现在两边没有分叉，整张表都是「直接照抄」。
 
@@ -183,7 +183,7 @@ adb shell am instrument -w \
     <包名>.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-当前状态：v31 与 v32 两份样本各 14 张表全部通过。v32 是 168 会话 / 673 节点 / 97 附件 / 476 用量；v31 是 1664 会话 / 11483 节点 / 8080 附件 / 8431 用量。v16（官方 2.1.6）明确不支持，不纳入样本集。测试按版本循环，哪份样本不在设备上就跳过哪一份。
+当前状态：v31 与 v32 两份样本各 14 张表全部通过，两层都验：读取层直接读原始备份，转换层把样本经转换器写成当前版本库再读。 转换层只比对源版本也有的列，因为转换后是当前版本结构；另有一条断言确认转换结果里没有残留指向别的安装的附件路径。期望值对附件绝对路径做了前缀归一（换成 `file://<files>/`），否则「路径被正确重写」会被当成「内容不一致」。还没做的判据：附件文件的哈希集合、settings 的关键字段、首次启动后 live 目录里没有归档之外的多余文件、搜索的人工闸门；样本类别里改 identity 的构造样本与本 fork 旧构建也还没有固定样本。v32 是 168 会话 / 673 节点 / 97 附件 / 476 用量；v31 是 1664 会话 / 11483 节点 / 8080 附件 / 8431 用量。v16（官方 2.1.6）明确不支持，不纳入样本集。测试按版本循环，哪份样本不在设备上就跳过哪一份。
 
 每次改动 schema 或 `Settings` 之后要重跑全部样本，这条与 roadmap 一致。
 
@@ -192,7 +192,7 @@ adb shell am instrument -w \
 导入器本体。它与第一次改 schema 同一批做，顺序是导入器先落地并验证，再动结构：
 
 1. 读取层：先定 fixture 与期望值（行数、列集合、内容 hash，由独立脚本算出），再写 reader，用 androidTest 跑。
-2. 版本判定与分流：接到 `restoreFromBackupFile`。
+2. 版本判定与分流：接在 `BackupManager.stageRestore`，判定只读元数据。
 3. 写入：行数据 → 新建 Room 库 → 校验能打开且各表 hash 与期望值一致。
 4. settings 形状校验。附件替换天然复用（共用 `PendingRestore.buildEntries`）；归档要跟着分流走：现在的归档调用在 `stageRestore` 之后，导入器分支不走那条路，得把调用上移成两条分支共用，或在导入器分支里再调一次。
 5. 验收。
@@ -210,7 +210,7 @@ adb shell am instrument -w \
 - `upload/` 与 `fonts/` 在导出侧只收顶层文件，替换侧却是递归删除。payload 同时带数据库时，live 里这两个目录下的子目录文件会被删掉，因为它们不可能出现在任何 payload 里。这符合替换语义，但值得知道。
 - `media_creation/` 下的 `.part` 临时文件导出时被跳过，替换时会当成「备份里没有」而删除。它们是半成品，删掉通常无害，但下载中的任务会受影响。
 - 设备上跑 androidTest 时曾遇到测试进程解析不到新类，查下来是 `adb push` 没有覆盖设备上的旧文件，装的一直是旧 APK：推送前先删掉远端文件再装即可。记在这里是因为排查花了不少时间，不是代码问题。
-- 真正的官方备份样本还没拿到，读取层的正向测试暂时用应用自己创建的库当替身。
+- 读取层与写入层的单元测试仍用应用自己创建的库当替身；真实官方样本走 `OfficialSampleAcceptanceTest`，只在设备上有样本时执行。
 - live 文件名里带反斜杠会让整次导入失败。校验放在 `buildRemovalEntries` 里、journal 落地之前，所以失败会走 `failed-*` 分支：用户看到「已保留原数据」，下次启动不会重播。漏掉这层校验的话，`apply` 会反复抛异常，而 `RikkaHubApp` 只捕获 `RestoreFailedException`，结果是每次启动都崩。这种文件名不需要 root 就能产生：`FileUtils` 从 provider 的 displayName 取扩展名，`foo.\x` 会拼出带反斜杠的名字。
 - 归档目前在应用内取不回来，需要 root 或 adb。
 - 字段语义变化无法从 header 识别，只能靠流程。
