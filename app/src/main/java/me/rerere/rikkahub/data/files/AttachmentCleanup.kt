@@ -2,6 +2,7 @@ package me.rerere.rikkahub.data.files
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.db.AppDatabase
@@ -39,6 +40,12 @@ class AttachmentCleanup(
             (settings.displaySetting.userAvatar as? Avatar.Image)?.url?.let(::add)
         }.mapNotNull { url -> url.substringAfter("/files/", "").takeIf { it.isNotEmpty() } }.toSet()
 
+        // 收藏存的是消息快照，图片引用也在里面；消息删掉、收藏还在时，文件不能当孤儿。
+        // 一次读完所有收藏的 JSON，避免每个候选都查一遍库。
+        val favoriteJson = database.favoriteDao().listAll().first().joinToString("\n") {
+            it.refJson + "\n" + it.snapshotJson + "\n" + (it.metaJson ?: "")
+        }
+
         var deleted = 0
         var freed = 0L
         var kept = 0
@@ -47,6 +54,7 @@ class AttachmentCleanup(
             // 判据是子串匹配，方向偏保守：文件名里带反斜杠之类会被 JSON 转义，裸路径可能匹配
             // 不到，所以转义后的形状也试一次，任一处命中都算「还在用」。
             val referenced = candidate in avatarPaths ||
+                candidate in favoriteJson ||
                 database.messageNodeDao().hasFileReference(candidate) ||
                 (candidate.contains(
                     '\\'

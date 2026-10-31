@@ -132,6 +132,18 @@ class MessageFtsManager(private val database: AppDatabase) {
         db.execSQL("DELETE FROM message_fts_rowid")
     }
 
+    /**
+     * 索引里有没有内容。
+     *
+     * 用来在启动时发现「有会话但索引是空的」：备份恢复会换掉整个库，索引是派生数据、搬不过来；
+     * 全量重建中途被杀也会留下空或残缺的索引，而重建开头就是清空，所以残缺与全空一样要重来。
+     */
+    suspend fun isEmpty(): Boolean = withContext(Dispatchers.IO) {
+        database.openHelper.readableDatabase.query("SELECT COUNT(*) FROM message_fts_rowid").use {
+            it.moveToFirst() && it.getInt(0) == 0
+        }
+    }
+
     suspend fun search(
         keyword: String,
         sort: MessageSearchSort = MessageSearchSort.RELEVANCE,

@@ -309,6 +309,15 @@ class ConversationRepository(
         return conversationDAO.countAll()
     }
 
+    /**
+     * 有会话但全文索引是空的。
+     *
+     * 启动时用它决定要不要重建：备份恢复会换掉整个库、索引搬不过来；全量重建中途被杀也会
+     * 留下空的索引，而重建的第一步就是清空，所以「空」与「残缺」一样要重来。
+     */
+    suspend fun needsSearchIndexRebuild(): Boolean =
+        countConversations() > 0 && messageFtsManager.isEmpty()
+
     suspend fun countConversationsByAssistant(): Map<Uuid, Int> {
         return conversationDAO.countByAssistant().mapNotNull { row ->
             runCatching { Uuid.parse(row.assistantId) }.getOrNull()?.let { it to row.count }
