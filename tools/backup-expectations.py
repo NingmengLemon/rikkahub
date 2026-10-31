@@ -26,11 +26,15 @@ import json
 import re
 import sqlite3
 import struct
+import zipfile
 
 # 附件引用是绝对 file:// 路径，包名与用户号都在里面，导入时会被换成本机路径。校验内容时
 # 把这段前缀统一成占位符，否则「路径被正确重写」会被当成「内容不一致」。
 FILE_PREFIX = re.compile(r'file:///data/(?:user/\d+|data)/[^/"\s]+/files/')
 FILE_PREFIX_PLACEHOLDER = 'file://<files>/'
+
+# 备份里承载附件的四个目录
+ATTACHMENT_FOLDERS = ('upload', 'skills', 'fonts', 'media_creation')
 
 
 def cell(kind: bytes, payload: bytes) -> bytes:
@@ -79,6 +83,8 @@ def main():
     parser.add_argument('--schema', required=True)
     parser.add_argument('--db', required=True)
     parser.add_argument('--out', required=True)
+    parser.add_argument('--settings', help='解压出来的 settings.json，只统计条数')
+    parser.add_argument('--zip', help='完整备份 zip，算附件清单')
     args = parser.parse_args()
 
     with open(args.schema, encoding='utf-8') as handle:
@@ -107,6 +113,41 @@ def main():
         print(f'{table}: {count} rows {digest[:16]}...')
 
     connection.close()
+
+    if args.settings:
+        with open(args.settings, encoding='utf-8') as handle:
+            settings = json.load(handle)
+        result['settings'] = {
+            'assistants': len(settings.get('assistants') or []),
+            'providers': len(settings.get('providers') or []),
+        }
+        print(f"settings: assistants={result['settings']['assistants']} "
+              f"providers={result['settings']['providers']}")
+
+    if args.zip:
+        attachments = []
+        with zipfile.ZipFile(args.zip) as archive:
+            for info in archive.infolist():
+                if info.is_dir():
+                    continue
+                folder = info.filename.split('/')[0]
+                if folder not in ATTACHMENT_FOLDERS:
+                    continue
+                digest = hashlib.sha256()
+                with archive.open(info) as stream:
+                    while True:
+                        chunk = stream.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        digest.update(chunk)
+                attachments.append({
+                    'path': info.filename,
+                    'size': info.file_size,
+                    'sha256': digest.hexdigest(),
+                })
+        result['attachments'] = attachments
+        print(f'attachments: {len(attachments)} files')
+
     with open(args.out, 'w', encoding='utf-8') as handle:
         json.dump(result, handle, ensure_ascii=False, indent=2)
     print(f'wrote {args.out} (user_version={version})')
