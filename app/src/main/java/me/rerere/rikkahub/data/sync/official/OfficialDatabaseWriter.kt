@@ -16,6 +16,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 internal class OfficialDatabaseWriter(
     private val database: SupportSQLiteDatabase,
+    /** 当前应用的 files 目录 URI 前缀，用来重定向官方备份里的绝对路径 */
+    private val filesUriPrefix: String,
 ) {
 
     /** 返回写入的总行数 */
@@ -44,7 +46,8 @@ internal class OfficialDatabaseWriter(
                 null -> Unit
                 is Long -> values.put(column.name, value)
                 is Double -> values.put(column.name, value)
-                is String -> values.put(column.name, value)
+                // 文本列可能嵌着附件引用，统一重定向到当前安装
+                is String -> values.put(column.name, OfficialUrlRewriter.rewriteEmbedded(value, filesUriPrefix))
                 is ByteArray -> values.put(column.name, value)
                 else -> error("未知的列值类型：${table.name}.${column.name} = ${value::class}")
             }

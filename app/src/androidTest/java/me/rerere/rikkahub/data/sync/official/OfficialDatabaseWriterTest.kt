@@ -1,10 +1,12 @@
 package me.rerere.rikkahub.data.sync.official
 
+import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import me.rerere.rikkahub.data.db.AppDatabaseFactory
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,7 +40,7 @@ class OfficialDatabaseWriterTest {
         val written: Int
         try {
             OfficialDatabaseReader.open(source).use { reader ->
-                written = OfficialDatabaseWriter(room.openHelper.writableDatabase).write(reader)
+                written = OfficialDatabaseWriter(room.openHelper.writableDatabase, filesUriPrefix()).write(reader)
             }
         } finally {
             room.close()
@@ -65,7 +67,7 @@ class OfficialDatabaseWriterTest {
         val written: Int
         try {
             OfficialDatabaseReader.open(source).use { reader ->
-                written = OfficialDatabaseWriter(room.openHelper.writableDatabase).write(reader)
+                written = OfficialDatabaseWriter(room.openHelper.writableDatabase, filesUriPrefix()).write(reader)
             }
         } finally {
             room.close()
@@ -99,7 +101,10 @@ class OfficialDatabaseWriterTest {
         val room = AppDatabaseFactory.create(context, target.absolutePath)
         try {
             OfficialDatabaseReader.open(source).use { reader ->
-                assertEquals(2, OfficialDatabaseWriter(room.openHelper.writableDatabase).write(reader))
+                assertEquals(
+                    2,
+                    OfficialDatabaseWriter(room.openHelper.writableDatabase, filesUriPrefix()).write(reader)
+                )
             }
         } finally {
             room.close()
@@ -116,6 +121,42 @@ class OfficialDatabaseWriterTest {
         }
     }
 
+    /** 附件引用带着官方包名的绝对路径，写进来之前必须换成当前安装的 */
+    @Test fun rewritesAbsoluteFileUrlsToTheCurrentInstall() {
+        val oldUrl = "file:///data/user/0/me.rerere.rikkahub/files/upload/a.png"
+        val messages = """[{"type":"image","url":"$oldUrl"}]"""
+        val source = appDatabase("rewrite-source.db") { database ->
+            database.execSQL(
+                "INSERT INTO ConversationEntity (id, title, nodes, create_at, update_at) " +
+                    "VALUES ('c1', 'demo', '[]', 1, 2)"
+            )
+            database.execSQL(
+                "INSERT INTO message_node (id, conversation_id, node_index, messages, select_index) " +
+                    "VALUES ('m1', 'c1', 0, ?, 0)",
+                arrayOf(messages),
+            )
+        }
+
+        val target = rawDatabase("rewrite-target.db")
+        val room = AppDatabaseFactory.create(context, target.absolutePath)
+        try {
+            OfficialDatabaseReader.open(source).use { reader ->
+                OfficialDatabaseWriter(room.openHelper.writableDatabase, filesUriPrefix()).write(reader)
+            }
+        } finally {
+            room.close()
+        }
+
+        OfficialDatabaseReader.open(target).use { reader ->
+            val rewritten = reader.rows("message_node").single().string("messages").orEmpty()
+            assertTrue(
+                "应当改写成当前安装的路径，实际是 $rewritten",
+                rewritten.contains(filesUriPrefix() + "upload/a.png"),
+            )
+            assertFalse("旧包名的路径不该留下", rewritten.contains("me.rerere.rikkahub"))
+        }
+    }
+
     /** 用应用自己的 schema 建一个库，可选地往里写点数据 */
     private fun appDatabase(name: String, prepare: (androidx.sqlite.db.SupportSQLiteDatabase) -> Unit = {}): File {
         val file = rawDatabase(name)
@@ -127,6 +168,8 @@ class OfficialDatabaseWriterTest {
         }
         return file
     }
+
+    private fun filesUriPrefix(): String = context.filesDir.toUri().toString().trimEnd('/') + "/"
 
     private fun rawDatabase(name: String): File {
         workspace.mkdirs()
