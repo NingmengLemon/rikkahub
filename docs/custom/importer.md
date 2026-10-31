@@ -157,12 +157,33 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 
 判据：
 
-- 14 张表各自的条数，在「导入完成、尚未启动」这个时点比（`managed_files` 会被首次启动的 `syncManagedFiles` 改写）。
-- 每张表按主键排序后的内容 SHA-256，并写明规范化规则（列顺序、NULL 与空串、BLOB 的十六进制、Double 的格式、复合主键的排序键）。期望值由独立的 sqlite3 脚本从原始备份算出，不能由读取层自己算。
-- `message_node` 的 `node_index` 与 `select_index`。
+- 每张表按主键排序后的行数与内容 SHA-256，规范化规则见下。期望值由独立脚本从原始备份算出，不能用读取层自己算。
 - 附件的相对路径集合与每个文件的 SHA-256，外加「首次启动后 live 的四个目录里没有归档之外的多余文件」。
 - `settings` 的关键字段。
 - 搜索：固定一组查询与期望的会话 id 集合，导入前后结果集相同。我们的 FTS 用 `tokenize = 'simple'`，与官方的分词不一定一致，所以这条判据要求「同一组查询在官方客户端能搜到、导入后在本 fork 也能搜到相同的会话」；需要官方客户端，是人工闸门，不进 CI。
+
+规范化规则：每个单元格编码成「类型字节 + 4 字节小端长度 + 载荷」（`N` NULL 空载荷、`I` 十进制 ASCII、`R` IEEE754 双精度 8 字节大端、`T` UTF-8、`B` 原始字节），行之间写一个 `0x1e`，单元格顺序取快照里的列顺序，行顺序按主键升序。规则由 `tools/backup-expectations.py` 与 `OfficialSampleAcceptanceTest` 各实现一遍，两边逐字节一致。
+
+跑一遍验收的步骤（样本含私人数据，放仓库外）：
+
+```bash
+# 1. 从原始备份里取出库，算出期望值
+python tools/backup-expectations.py \
+    --schema app/schemas/me.rerere.rikkahub.data.db.AppDatabase/32.json \
+    --db <备份解压出来的 rikka_hub.db> \
+    --out <样本目录>/backup-expectations-v32.json
+
+# 2. 推到设备（adb push 不覆盖旧文件，先删）
+adb push <备份解压出来的 rikka_hub.db> /data/local/tmp/rikkahub-sample-v32.db
+adb push <样本目录>/backup-expectations-v32.json /data/local/tmp/backup-expectations-v32.json
+
+# 3. 跑验收
+adb shell am instrument -w \
+    -e class me.rerere.rikkahub.data.sync.official.OfficialSampleAcceptanceTest \
+    <包名>.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+当前状态：v32 样本上 14 张表全部通过（168 会话 / 673 节点 / 97 附件 / 476 用量）。v31 与 v16 样本还没有各自的期望值文件，所以只覆盖了 v32 这一版。
 
 每次改动 schema 或 `Settings` 之后要重跑全部样本，这条与 roadmap 一致。
 
