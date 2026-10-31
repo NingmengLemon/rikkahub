@@ -71,6 +71,7 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Clean
+import me.rerere.hugeicons.stroke.Delete02
 import me.rerere.hugeicons.stroke.Delete01
 import me.rerere.hugeicons.stroke.File01
 import me.rerere.hugeicons.stroke.FileAudio
@@ -78,6 +79,7 @@ import me.rerere.hugeicons.stroke.FileVideo
 import me.rerere.hugeicons.stroke.FolderOpen
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.db.entity.ManagedFileEntity
+import me.rerere.rikkahub.data.files.AttachmentCleanup
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.ui.components.ai.ExtensionEmptyState
@@ -94,6 +96,7 @@ import java.util.concurrent.TimeUnit
 @Composable
 fun SettingFilesPage(
     filesManager: FilesManager = koinInject(),
+    attachmentCleanup: AttachmentCleanup = koinInject(),
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val gridState = rememberLazyStaggeredGridState()
@@ -110,6 +113,8 @@ fun SettingFilesPage(
     var selectedFolder by remember { mutableStateOf(FileFolders.UPLOAD) }
     var pendingDelete by remember { mutableStateOf<ManagedFileEntity?>(null) }
     var showCleanSheet by remember { mutableStateOf(false) }
+    var showOrphanDialog by remember { mutableStateOf(false) }
+    var cleaningOrphans by remember { mutableStateOf(false) }
     var selectedCleanRange by remember { mutableStateOf(CleanRange.DAYS_7) }
     val files by filesManager.observe(selectedFolder).collectAsState(initial = emptyList())
 
@@ -172,12 +177,60 @@ fun SettingFilesPage(
         }
     }
 
+    if (showOrphanDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!cleaningOrphans) showOrphanDialog = false },
+            title = { Text("清理未引用的附件") },
+            text = {
+                Text(
+                    "附件按内容只存一份，删除对话不会立刻释放空间。这里会扫一遍全部消息和头像，" +
+                        "把没人引用的文件删掉。扫描要读所有消息，可能需要一会儿。"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !cleaningOrphans,
+                    onClick = {
+                        cleaningOrphans = true
+                        scope.launch {
+                            runCatching { attachmentCleanup.collect() }
+                                .onSuccess {
+                                    toaster.show("已删除 ${it.deleted} 个，释放 ${it.freedBytes.fileSizeToString()}")
+                                    showOrphanDialog = false
+                                }
+                                .onFailure { toaster.show("清理失败：${it.message}") }
+                            cleaningOrphans = false
+                        }
+                    }
+                ) {
+                    Text(if (cleaningOrphans) "正在清理..." else "开始清理")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !cleaningOrphans,
+                    onClick = { showOrphanDialog = false }
+                ) {
+                    Text(stringResource(R.string.setting_files_page_cancel_action))
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.setting_files_page_title)) },
                 navigationIcon = { BackButton() },
                 actions = {
+                    IconButton(
+                        onClick = { showOrphanDialog = true },
+                    ) {
+                        Icon(
+                            imageVector = HugeIcons.Delete02,
+                            contentDescription = "清理未引用的附件",
+                        )
+                    }
                     IconButton(
                         onClick = { showCleanSheet = true },
                         enabled = files.isNotEmpty(),

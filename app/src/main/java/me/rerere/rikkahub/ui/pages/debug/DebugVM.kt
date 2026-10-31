@@ -16,7 +16,6 @@ import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.datastore.DEFAULT_ASSISTANT_ID
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
-import me.rerere.rikkahub.data.files.AttachmentCleanup
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.MessageNode
@@ -28,11 +27,7 @@ import kotlin.uuid.Uuid
 class DebugVM(
     private val settingsStore: SettingsStore,
     private val conversationRepository: ConversationRepository,
-    private val attachmentCleanup: AttachmentCleanup,
 ) : ViewModel() {
-
-    /** 删掉没人引用的附件，返回删掉的个数与释放的字节数 */
-    suspend fun cleanupOrphanAttachments(): AttachmentCleanup.Report = attachmentCleanup.collect()
 
     val settings: StateFlow<Settings> = settingsStore.settingsFlow
         .stateIn(viewModelScope, SharingStarted.Lazily, Settings.dummy())
