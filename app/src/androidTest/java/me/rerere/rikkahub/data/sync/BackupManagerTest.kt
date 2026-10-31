@@ -2,6 +2,7 @@ package me.rerere.rikkahub.data.sync
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.database.sqlite.SQLiteDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
@@ -12,6 +13,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.db.AppDatabase
 import me.rerere.rikkahub.data.db.AppDatabaseFactory
+import me.rerere.rikkahub.data.sync.official.OfficialDatabaseHeaders
+import me.rerere.rikkahub.data.sync.official.OfficialDatabaseSchema
 import me.rerere.rikkahub.utils.JsonInstant
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -193,6 +196,61 @@ class BackupManagerTest {
             failed = true
         }
         assertTrue(failed)
+        assertFalse(File(context.noBackupFilesDir, "backup-restore/pending").exists())
+        assertEquals("live", probe(liveDatabase))
+    }
+
+    /** 同版本但结构不同：迁移链不管，Room 会拒绝，必须先转成当前版本再发布 */
+    @Test fun sameVersionWithDifferentIdentityIsConvertedBeforePublishing() = runBlocking {
+        val source = File(directory, "same-version")
+        val archive = File(directory, "same-version.zip")
+        withRoom(source) { room ->
+            val db = room.openHelper.writableDatabase
+            db.execSQL(
+                "INSERT INTO workspaces (id, name, root, shell_status, created_at, updated_at, type) " +
+                    "VALUES ('w1', 'demo', '/tmp/demo', 'READY', 1, 2, 'LOCAL')"
+            )
+            // 冒充「同版本但 schema 被改过」的库
+            db.execSQL("UPDATE room_master_table SET identity_hash = '00000000000000000000000000000000'")
+            DatabaseBackup.checkpoint(db)
+        }
+        ZipOutputStream(archive.outputStream()).use { zip -> addFile(zip, DatabaseBackup.ARCHIVE_DATABASE, source) }
+
+        manager.stageRestore(archive, includeDatabase = true, includeFiles = false)
+
+        val staged = File(context.noBackupFilesDir, "backup-restore/pending/payload/database/rikka_hub")
+        assertTrue("转换结果应当已发布到 pending", staged.isFile)
+        SQLiteDatabase.openDatabase(staged.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            assertEquals(OfficialDatabaseSchema.VERSION, db.version)
+            OfficialDatabaseHeaders.readIdentityHash(db)?.let {
+                assertEquals("转换后应当是我们的结构", OfficialDatabaseSchema.IDENTITY_HASH, it)
+            } ?: error("转换结果应当带 schema 指纹")
+            db.rawQuery("SELECT name FROM workspaces WHERE id = 'w1'", null).use {
+                assertTrue("行数据应当被搬过去", it.moveToFirst())
+                assertEquals("demo", it.getString(0))
+            }
+        }
+        assertEquals("live 在重启前不动", "live", probe(liveDatabase))
+    }
+
+    /** 版本高于本应用：迁移链降不了，明确拒绝，不要回落到迁移链让 Room 报个看不懂的错 */
+    @Test fun newerVersionIsRejectedWithoutTouchingLiveDatabase() = runBlocking {
+        val source = File(directory, "newer")
+        val archive = File(directory, "newer.zip")
+        withRoom(source) { room ->
+            val db = room.openHelper.writableDatabase
+            DatabaseBackup.checkpoint(db)
+            db.execSQL("PRAGMA user_version = 33")
+        }
+        ZipOutputStream(archive.outputStream()).use { zip -> addFile(zip, DatabaseBackup.ARCHIVE_DATABASE, source) }
+
+        val error = runCatching { manager.stageRestore(archive, includeDatabase = true, includeFiles = false) }
+            .exceptionOrNull()
+        assertTrue("高版本必须失败，实际是 $error", error is IllegalStateException)
+        assertTrue(
+            "提示要说明版本高，实际是 ${error?.message}",
+            error?.message.orEmpty().contains("高于"),
+        )
         assertFalse(File(context.noBackupFilesDir, "backup-restore/pending").exists())
         assertEquals("live", probe(liveDatabase))
     }

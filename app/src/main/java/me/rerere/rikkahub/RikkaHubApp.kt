@@ -30,6 +30,7 @@ import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.remote.ModelsDevUpdater
+import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.data.skills.SkillManager
 import me.rerere.rikkahub.data.sync.BackupManager
@@ -62,8 +63,9 @@ class RikkaHubApp : Application() {
     override fun onCreate() {
         super.onCreate()
         // Restore files and settings before eager Koin singletons or workers can access them.
+        var restored = false
         try {
-            val restored = runBlocking(Dispatchers.IO) {
+            restored = runBlocking(Dispatchers.IO) {
                 BackupManager.applyPendingRestore(this@RikkaHubApp, JsonInstant)
             }
             if (restored) {
@@ -101,6 +103,12 @@ class RikkaHubApp : Application() {
 
         // sync upload files to DB
         syncManagedFiles()
+
+        // 备份恢复换掉的是一个全新的库，全文索引是派生数据、库里是空的；不重建就搜不到东西。
+        // 只在这一步做，因为正常启动时索引本来就在。
+        if (restored) {
+            rebuildSearchIndexes()
+        }
 
         // Extract builtin skills from assets after install/update
         extractBuiltinSkills()
@@ -171,6 +179,24 @@ class RikkaHubApp : Application() {
             val dir = appTempFolder
             if (dir.exists()) {
                 dir.deleteRecursively()
+            }
+        }
+    }
+
+    /**
+     * 备份恢复后重建全文索引。
+     *
+     * `message_fts*` 不在 Room 的 schema 里，`AppDatabaseFactory.onOpen` 只保证表存在，
+     * 内容要靠这里补。重建是「先清空再逐会话索引」，中途被杀会留下不完整的索引，所以失败时
+     * 只记日志：下次全量重建会覆盖它，不做增量补救。
+     */
+    private fun rebuildSearchIndexes() {
+        get<AppScope>().launch(Dispatchers.IO) {
+            runCatching {
+                get<ConversationRepository>().rebuildAllIndexes()
+                Log.i(TAG, "Rebuilt search indexes after restore")
+            }.onFailure {
+                Log.e(TAG, "Failed to rebuild search indexes after restore", it)
             }
         }
     }
