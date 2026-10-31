@@ -99,15 +99,13 @@ class OfficialBackupRestoreAcceptanceTest {
     }
 
     /**
-     * 已知问题：settings 里的条目在导入链路里会变少。
+     * settings 的条数也要原样保留。
      *
-     * 样本 settings.json 有 11 个助手、37 个服务商；经过 stageRestore 的 decode + encode 之后
-     * 只剩 5 与 29。附件与表数据都正常，所以问题在 settings 处理链（migrate / decode / encode），
-     * 不是解压。可能是把 TTS / ASR 服务商拆到独立字段造成的差异，也可能是真的丢了；
-     * 在弄清楚之前别让验收悄悄放过它。
+     * 期望值必须从**同一份归档**里取：之前我拿另一份样本的 settings.json 去算期望值，
+     * 得到 11 个助手、37 个服务商，而这份归档本身只有 5 与 29，于是看起来像是导入丢了东西。
+     * 结论是处理链没问题，是期望值的来源错了。
      */
     @Test
-    @org.junit.Ignore("已知问题：助手 11->5、服务商 37->29，待查 settings 处理链")
     fun settingsEntriesSurviveTheStagingPipeline() = runBlocking {
         assumeTrue("没有放整份备份样本，跳过", sampleZip.isFile && expectations.isFile)
         val expected = Json.parseToJsonElement(expectations.readText()).jsonObject
