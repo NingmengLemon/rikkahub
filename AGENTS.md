@@ -119,10 +119,14 @@ This repository carries personal customizations on top of upstream `rikkahub/rik
   the stage split, the easy-migration target, the upstream follow-up strategy, and distribution/compliance notes.
 - Tag customization commits with the `custom` scope, e.g. `feat(custom): ...`, and append the change to the checklist
   table in `docs/custom/README.md` so a later upstream merge can be checked against it.
-- Persisted data structures stay frozen until the official-backup importer exists and passes validation on the fixed
-  sample set: no Room schema changes, no changes to the meaning of existing DataStore keys, no changes to existing
-  serialized field meanings. New serialized fields must carry a default. Stage 1 of `docs/custom/roadmap.md` defines
-  the importer and the validation gate that lift this freeze.
+- The persisted-data freeze is lifted: the official-backup importer exists and passes validation on the fixed sample
+  set, so Room schema changes and `Settings` structure changes are allowed. What still holds is backwards
+  compatibility with our own past builds: a Room change ships with its migration, new serialized fields carry a
+  default, existing field meanings do not change, and the acceptance samples are re-run afterwards. The
+  data-structure section of `docs/custom/README.md` lists the constraints; `docs/custom/importer.md` holds the
+  acceptance procedure.
+- A Room schema change also makes the official-compatible export fail until its trimming logic exists (see C18). That
+  failure is deliberate, not a bug.
 - Prefer disabling an entry point over deleting an implementation, so upstream merges stay cheap. This is a
   merge-cost concession rather than a permanent rule; the `app/` scope in which it lifts is described in the
   customization-principles section of `docs/custom/roadmap.md`.
