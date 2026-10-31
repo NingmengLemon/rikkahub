@@ -42,6 +42,14 @@ class OfficialUrlRewriterTest {
         assertEquals(outside, OfficialUrlRewriter.rewrite(outside, CURRENT))
     }
 
+    @Test fun `rewrites the legacy data data layout`() {
+        // 更老的布局是 /data/data/<包名>/files，而不是 /data/user/<N>/<包名>/files
+        assertEquals(
+            CURRENT + "upload/legacy.png",
+            OfficialUrlRewriter.rewrite("file:///data/data/me.rerere.rikkahub/files/upload/legacy.png", CURRENT),
+        )
+    }
+
     @Test fun `rewrites every reference embedded in a json payload`() {
         val json = """[{"type":"image","url":"file:///data/user/0/me.rerere.rikkahub/files/upload/a.png"},""" +
             """{"type":"document","url":"file:///data/user/0/me.rerere.rikkahub/files/upload/b.pdf"}]"""

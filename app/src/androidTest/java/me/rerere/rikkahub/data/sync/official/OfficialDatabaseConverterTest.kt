@@ -43,10 +43,13 @@ class OfficialDatabaseConverterTest {
         }
     }
 
-    @Test fun reportsNoSnapshotForAnUnknownVersion() {
-        // v16 那份样本明确不支持，snapshotOf 要返回 null，调用方据此回到迁移链
-        val sample = File("/data/local/tmp/rikkahub-sample-v16.db")
-        assumeTrue("没有放 v16 样本，跳过", sample.isFile)
-        assertEquals(null, OfficialDatabaseConverter.snapshotOf(sample))
+    @Test fun readsTheHeaderOfTheProvidedSamples() {
+        // 恢复流程靠这两处元数据分流：版本决定能不能交给迁移链，指纹决定要不要转换
+        val v32 = File("/data/local/tmp/rikkahub-sample-v32.db")
+        assumeTrue("没有放 v32 样本，跳过", v32.isFile)
+        OfficialDatabaseHeaders.read(v32)?.let { header ->
+            assertEquals(32, header.version)
+            assertEquals(OfficialDatabaseSchema.IDENTITY_HASH, header.identityHash)
+        } ?: error("应当能读出 v32 样本的 header")
     }
 }

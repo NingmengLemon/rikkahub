@@ -15,7 +15,7 @@ package me.rerere.rikkahub.data.sync.official
 internal object OfficialUrlRewriter {
 
     /** `file:///data/user/0/<包名>/files/`，包名段不限定 */
-    private val absoluteFilesUri = Regex("""file:///data/(?:user|data)/\d+/[^/]+/files/""")
+    private val absoluteFilesUri = Regex("""file:///data/(?:user/\d+|data)/[^/]+/files/""")
 
     /**
      * @param filesUriPrefix 当前应用的 files 目录 URI 前缀，形如 `file:///data/user/0/<包>/files/`

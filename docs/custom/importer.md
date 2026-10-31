@@ -39,27 +39,25 @@
 
 ## 分流
 
-分流要放在 `WebDavSync.restoreFromBackupFile`，那是本地导入与 WebDAV 导入唯一的共用入口。
-
-判定按 `user_version` 先行，identity 只用来判来源：
+分流放在 `BackupManager.stageRestore` 处理暂存库的地方：本地导入与 WebDAV 导入最终都汇到这里，判定发生在读任何业务表之前，只碰两处元数据（`user_version` 与 `room_master_table` 的 schema 指纹）。判定本身抽在 `OfficialRestorePlanner`，是纯函数，可以直接跑 JVM 测试。
 
 ```
-ourVersion：编译进应用的当前 Room 版本（现在 32）
-officialVersions：已知官方版本的快照集合（现在只有 v32）
+ourVersion：编译进应用的当前 Room 版本
+ourIdentity：编译进应用的 schema 指纹
 
-version > ourVersion                    → 失败（没有 downgrade，也不该猜）
-version == ourVersion 且 identity == ourIdentity → stageRestore
-version ∈ officialVersions             → 导入器（用该版本的快照读）
-version < ourVersion                   → stageRestore（迁移链）
-其他                                   → 失败
+version > ourVersion   → 拒绝（迁移链降不了版本；官方升版通常是加列，硬写会在插入时崩）
+version < ourVersion   → 迁移链
+version == ourVersion：
+    identity == ourIdentity → 迁移链
+    identity 缺失           → 拒绝（来源判不出来）
+    其他                    → 转换（用该版本的官方快照读，写成当前版本）
 ```
 
-两点说明：
+三点说明：
 
-- `ourVersion` 用编译进应用的常量，不从活库读。升级后首次启动时活库可能还停在旧版本，读它会把官方 v32 误判成「版本更高」；全新安装时活库文件可能还不存在。
-- 版本先行是因为 identity 不随版本变化：官方若发布只改数据、不改 DDL 的新版本，identity 仍是同一个值，只看 identity 会把它当作已知版本放进来。
-
-「版本低、identity 未知」这一行是明确的宽容：它可能是自家旧库，也可能是结构兼容的官方旧库，两者都交给迁移链试。迁移链打不开时会明确失败，不会写坏数据。
+- 版本先行：`user_version` 决定能不能交给迁移链，指纹只在版本相同时用来判「结构被改过」。
+- `ourVersion` 与 `ourIdentity` 都用编译进应用的常量，不从活库读。升级后首次启动时活库可能还停在旧版本，读它会把官方新版本误判成「版本更高」；全新安装时活库文件可能还不存在。
+- 「版本低、identity 未知」交给迁移链试，那可能是自家旧库，也可能是结构兼容的官方旧库。迁移链打不开时会明确失败，不会写坏数据。
 
 ## 转换流程
 
@@ -95,8 +93,8 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 - `message_node` 的 `node_index`、`select_index` 与 id 原样保留。`ConversationEntity.nodes` 是遗留空列（v12 起恒为 `"[]"`，树在 `message_node` 里），照抄即可。
 - 自增表（`GenMediaEntity`、`managed_files`、`usage_record`）显式写 id；SQLite 会自己把 `sqlite_sequence` 提到显式 id 之上。
 - JSON 字段（`UIMessage`、`config`、`toolApprovals` 等）原样搬运，不解析再序列化。解析会丢未知字段，也会把官方的格式变化变成我们这边的转换错误。
-- 附件引用是绝对 `file://` URI，包名在路径里。写入文本列前要把 `file:///data/(user|data)/<任意>/<任意包名>/files/` 前缀换成当前应用的 files 目录，否则导入到改过包名的应用后附件全部失配。真实样本里有 9080 处消息引用、11 个助手头像、1 个用户头像用的是这个形式。只认这一种形状，不绑定包名；JSON 整段做字符串替换，不解析。
-- 快照里有、我们当前的 `@Entity` 没有的列：拒绝导入这一版，不按默认值硬填。写入层目前只按快照列写，这项对账等字段映射层落地时一起做；现在双方同为 v32，不可达。我们是官方没有的列按声明默认值填。
+- 附件引用是绝对 `file://` URI，包名在路径里。写入文本列前要把 `file:///data/(user|data)/<任意>/<任意包名>/files/` 前缀换成当前应用的 files 目录，否则导入到改过包名的应用后附件全部失配。真实样本里有 9080 处消息引用、11 个助手头像、1 个用户头像用的是这个形式。只认这一种形状，不绑定包名；JSON 整段做字符串替换，不解析。等附件引用改成相对形式之后，这一步对自家归档不再需要，但官方备份进来的方向仍然是绝对路径，重写要一直保留。
+- 快照里有、我们当前的 `@Entity` 没有的列：拒绝导入这一版，不按默认值硬填。转换器在动手写之前就做这项对账，缺列时给出明确信息而不是让插入失败。
 - 字段级语义：每个支持的官方版本带一份映射表，逐列写清「直接照抄」还是「需要转换」，并配一条完整性测试，保证表里覆盖了该版本快照的每一列。分叉之后只改这张表，不改读取层。现在两边没有分叉，整张表都是「直接照抄」。
 
 ## settings

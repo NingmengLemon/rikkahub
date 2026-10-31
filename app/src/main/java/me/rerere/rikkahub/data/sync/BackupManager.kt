@@ -25,7 +25,11 @@ import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.files.MediaCreationFiles
 import me.rerere.rikkahub.data.sync.official.OfficialDatabaseAdapter
 import me.rerere.rikkahub.data.sync.official.OfficialDatabaseConverter
+import me.rerere.rikkahub.data.sync.official.OfficialDatabaseHeaders
 import me.rerere.rikkahub.data.sync.official.OfficialDatabaseSchema
+import me.rerere.rikkahub.data.sync.official.OfficialRestorePlan
+import me.rerere.rikkahub.data.sync.official.OfficialRestorePlanner
+import me.rerere.rikkahub.data.sync.official.OfficialSnapshots
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -168,16 +172,29 @@ class BackupManager(
                     require(restoredEntries > 0) { "No selected data found in the backup" }
                     require(!stagedWal.exists() || stagedDatabase.exists()) { "Backup WAL has no matching database" }
                     if (stagedDatabase.exists()) {
-                        // 版本高于本仓库时迁移链无能为力，先用导入器把它转成当前版本；
-                        // 低了或相同都交给迁移链，那是已经验证过的路径。
-                        val snapshot = OfficialDatabaseConverter.snapshotOf(stagedDatabase)
-                        if (snapshot != null && snapshot.version > OfficialDatabaseSchema.VERSION) {
-                            val converted = File(staging, "converted-${stagedDatabase.name}")
-                            OfficialDatabaseConverter(context).convert(stagedDatabase, converted)
-                            check(stagedDatabase.delete()) { "Cannot replace staged database" }
-                            Files.move(converted.toPath(), stagedDatabase.toPath())
-                        }
+                        // 先把源库的 WAL 合进主文件：转换要读它，而且旧 sidecar 留到替换之后
+                        // 会被下一次 normalize 的 checkpoint 合进新库，混进去的是旧页。
                         DatabaseBackup.normalize(context, stagedDatabase)
+                        // 判定只看元数据，在读任何业务表之前完成。读不出来就交给迁移链，
+                        // 由 Room 自己报错，而不是在这里猜。
+                        OfficialDatabaseHeaders.read(stagedDatabase)?.let { header ->
+                            when (val plan = OfficialRestorePlanner.plan(
+                                version = header.version,
+                                identityHash = header.identityHash,
+                                ourVersion = OfficialDatabaseSchema.VERSION,
+                                ourIdentity = OfficialDatabaseSchema.IDENTITY_HASH,
+                                snapshots = OfficialSnapshots.BY_VERSION,
+                            )) {
+                                OfficialRestorePlan.Migrate -> Unit
+                                is OfficialRestorePlan.Convert -> {
+                                    val converted = File(staging, "converted-${stagedDatabase.name}")
+                                    OfficialDatabaseConverter(context).convert(stagedDatabase, converted)
+                                    check(stagedDatabase.delete()) { "Cannot replace staged database" }
+                                    Files.move(converted.toPath(), stagedDatabase.toPath())
+                                }
+                                is OfficialRestorePlan.Reject -> error(plan.reason)
+                            }
+                        }
                         // Reject unsupported schemas before publishing; run supported old migrations on the copy.
                         val room = AppDatabaseFactory.create(context, stagedDatabase.absolutePath)
                         try {

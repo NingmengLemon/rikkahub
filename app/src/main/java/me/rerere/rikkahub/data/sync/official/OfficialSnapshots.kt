@@ -22,9 +22,6 @@ internal object OfficialSnapshots {
     ).associateBy { it.version }
 
     fun forVersion(version: Int): OfficialSnapshot? = BY_VERSION[version]
-
-    /** 当前官方最新版本，也是本仓库 Room schema 对着的那一版 */
-    val latest: OfficialSnapshot get() = BY_VERSION.getValue(OfficialDatabaseSchema.VERSION)
 }
 
 /**

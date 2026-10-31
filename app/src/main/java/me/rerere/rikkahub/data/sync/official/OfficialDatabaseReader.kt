@@ -154,6 +154,4 @@ internal class OfficialRow(
     fun string(columnName: String): String? = value(columnName) as String?
 
     fun long(columnName: String): Long? = value(columnName) as Long?
-
-    fun isNull(columnName: String): Boolean = value(columnName) == null
 }

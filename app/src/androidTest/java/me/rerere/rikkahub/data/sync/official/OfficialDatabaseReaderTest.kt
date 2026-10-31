@@ -90,14 +90,18 @@ class OfficialDatabaseReaderTest {
     }
 
     @Test
-    fun failsWhenTheSchemaVersionDiffers() {
+    fun failsWhenTheSchemaVersionIsUnknown() {
         val file = appDatabase("version.db") {}
         SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READWRITE).use { database ->
-            database.version = OfficialDatabaseSchema.VERSION + 1
+            database.version = 33
         }
         val error = runCatching { OfficialDatabaseReader.open(file) }.exceptionOrNull()
-        assertTrue("版本不符必须失败，实际是 $error", error is IllegalStateException)
-        assertTrue("错误信息要指出版本，实际是 ${error?.message}", error?.message.orEmpty().contains("版本"))
+        // 未知版本没有快照可读，读取层拒绝；分流要在更早的地方就把它挡下来
+        assertTrue("未知版本必须失败，实际是 $error", error is IllegalArgumentException)
+        assertTrue(
+            "错误信息要指出未知版本，实际是 ${error?.message}",
+            error?.message.orEmpty().contains("未知的官方版本"),
+        )
     }
 
     @Test
