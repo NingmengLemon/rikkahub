@@ -49,6 +49,7 @@ import me.rerere.hugeicons.stroke.Bug01
 import me.rerere.hugeicons.stroke.File01
 import me.rerere.hugeicons.stroke.PaintBoard
 import me.rerere.hugeicons.stroke.Wrench01
+import me.rerere.rikkahub.data.files.AttachmentCleanup
 import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.ui.components.ui.UIAvatar
 import me.rerere.rikkahub.ui.components.nav.BackButton
@@ -348,7 +349,64 @@ private fun RecoveryPage(vm: DebugVM) {
                 Text("恢复")
             }
         }
+        AttachmentCleanupSection(vm)
     }
+}
+
+/**
+ * 附件去重之后的回收入口。
+ *
+ * 附件按内容命名，同一份内容只有一份文件，所以不能靠「删消息就删文件」——那会删掉别处还在用
+ * 的。这里手动扫一遍引用，把没人提过的删掉。扫描要读全部消息，所以不做成自动的。
+ */
+@Composable
+private fun AttachmentCleanupSection(vm: DebugVM) {
+    val toaster = LocalToaster.current
+    val scope = rememberCoroutineScope()
+    var running by remember { mutableStateOf(false) }
+    var lastReport by remember { mutableStateOf<AttachmentCleanup.Report?>(null) }
+
+    Column(
+        modifier = Modifier.padding(top = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("附件清理", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "附件按内容存一份，重复上传不会多占空间。删除对话只会摘掉登记，文件要在这里统一回收。扫描会读全部消息，所以只在需要时点。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        lastReport?.let { report ->
+            Text("上次结果：删除 ${report.deleted} 个，保留 ${report.kept} 个，释放 ${formatBytes(report.freedBytes)}")
+        }
+        Button(
+            enabled = !running,
+            onClick = {
+                running = true
+                scope.launch {
+                    runCatching { vm.cleanupOrphanAttachments() }
+                        .onSuccess {
+                            lastReport = it
+                            toaster.show(
+                                "已删除 ${it.deleted} 个，释放 ${formatBytes(it.freedBytes)}",
+                                type = ToastType.Success,
+                            )
+                        }
+                        .onFailure { toaster.show("清理失败: ${it.message}", type = ToastType.Error) }
+                    running = false
+                }
+            }
+        ) {
+            Text(if (running) "正在清理..." else "扫描并清理")
+        }
+    }
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024 * 1024 -> "%.2f GB".format(bytes / 1024.0 / 1024 / 1024)
+    bytes >= 1024L * 1024 -> "%.2f MB".format(bytes / 1024.0 / 1024)
+    bytes >= 1024L -> "%.1f KB".format(bytes / 1024.0)
+    else -> "$bytes B"
 }
 
 @Composable

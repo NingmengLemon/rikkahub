@@ -6,9 +6,6 @@ import android.net.Uri
 import android.util.Log
 import androidx.core.net.toFile
 import androidx.core.net.toUri
-import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -23,6 +20,10 @@ import me.rerere.rikkahub.data.repository.FilesRepository
 import me.rerere.rikkahub.utils.exportImage
 import me.rerere.rikkahub.utils.exportImageFile
 import me.rerere.rikkahub.utils.getActivity
+import java.io.File
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -43,12 +44,9 @@ class FilesManager(
     ): ManagedFileEntity = withContext(Dispatchers.IO) {
         val resolvedName = displayName ?: getFileNameFromUri(uri) ?: "file"
         val resolvedMime = mimeType ?: getFileMimeType(uri) ?: "application/octet-stream"
-        val target = createTargetFile(folder, resolvedName, resolvedMime)
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            target.outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
+        val target = context.contentResolver.openInputStream(uri)?.use { input ->
+            storeStream(folder, input, resolvedName, resolvedMime)
+        } ?: createTargetFile(folder, resolvedName, resolvedMime)
         createManagedFileEntity(
             folder = folder,
             file = target,
@@ -63,8 +61,7 @@ class FilesManager(
         displayName: String,
         mimeType: String = "application/octet-stream",
     ): ManagedFileEntity = withContext(Dispatchers.IO) {
-        val target = createTargetFile(folder, displayName, mimeType)
-        target.writeBytes(bytes)
+        val target = storeBytes(folder, bytes, displayName, mimeType)
         createManagedFileEntity(
             folder = folder,
             file = target,
@@ -79,8 +76,7 @@ class FilesManager(
         displayName: String = "pasted_text.txt",
         mimeType: String = "text/plain",
     ): ManagedFileEntity = withContext(Dispatchers.IO) {
-        val target = createTargetFile(folder, displayName, mimeType)
-        target.writeText(text)
+        val target = storeBytes(folder, text.toByteArray(), displayName, mimeType)
         createManagedFileEntity(
             folder = folder,
             file = target,
@@ -104,26 +100,13 @@ class FilesManager(
 
     fun createChatFilesByContents(uris: List<Uri>): List<Uri> {
         val newUris = mutableListOf<Uri>()
-        val dir = context.filesDir.resolve(FileFolders.UPLOAD)
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
         uris.forEach { uri ->
             runCatching {
                 val sourceName = getFileNameFromUri(uri) ?: uri.lastPathSegment ?: "file"
                 val sourceMime = getFileMimeType(uri)
-                val fileName = buildUuidFileName(displayName = sourceName, mimeType = sourceMime)
-                val file = dir.resolve(fileName)
-                if (!file.exists()) {
-                    file.createNewFile()
-                }
                 val inputStream = context.contentResolver.openInputStream(uri)
                     ?: error("Failed to open input stream for $uri")
-                inputStream.use { input ->
-                    file.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
+                val file = inputStream.use { storeStream(FileFolders.UPLOAD, it, sourceName, sourceMime) }
                 val guessedMime = sourceMime ?: guessMimeType(file, sourceName)
                 trackManagedFile(
                     folder = FileFolders.UPLOAD,
@@ -150,27 +133,15 @@ class FilesManager(
         mimeType: String = "image/png",
     ): List<Uri> {
         val newUris = mutableListOf<Uri>()
-        val dir = context.filesDir.resolve(FileFolders.UPLOAD)
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
         byteArrays.forEach { byteArray ->
-            val fileName = buildUuidFileName(displayName = displayName, mimeType = mimeType)
-            val file = dir.resolve(fileName)
-            if (!file.exists()) {
-                file.createNewFile()
-            }
-            val newUri = file.toUri()
-            file.outputStream().use { outputStream ->
-                outputStream.write(byteArray)
-            }
+            val file = storeBytes(FileFolders.UPLOAD, byteArray, displayName, mimeType)
             trackManagedFile(
                 folder = FileFolders.UPLOAD,
                 file = file,
                 displayName = displayName,
                 mimeType = mimeType
             )
-            newUris.add(newUri)
+            newUris.add(file.toUri())
         }
         return newUris
     }
@@ -189,7 +160,9 @@ class FilesManager(
                                 val urls = createChatFilesByByteArrays(listOf(byteArray))
                                 Log.i(
                                     TAG,
-                                    "convertBase64ImagePartToLocalFile: convert base64 img to ${urls.joinToString(", ")}"
+                                    "convertBase64ImagePartToLocalFile: convert base64 img to ${urls.joinToString(
+                                        ", "
+                                    )}"
                                 )
                                 part.copy(
                                     url = urls.first().toString(),
@@ -205,14 +178,18 @@ class FilesManager(
             )
         }
 
+    /**
+     * 附件改成按内容命名之后，同一份文件会被多处引用，删一条消息不能把文件删掉。
+     *
+     * 所以这里只摘掉登记，不删文件。被摘掉的登记没有对应行之后，文件什么时候回收交给之后
+     * 的标记-清除：扫一遍所有引用点，删掉没人引用的。代价是删除后空间不立即释放，换来的是
+     * 不会误删别处还在用的文件。
+     */
     fun deleteChatFiles(uris: List<Uri>) {
         val relativePaths = mutableSetOf<String>()
         uris.filter { it.toString().startsWith("file:") }.forEach { uri ->
             val file = uri.toFile()
             getRelativePathInFilesDir(file)?.let { relativePaths.add(it) }
-            if (file.exists()) {
-                file.delete()
-            }
         }
         if (relativePaths.isNotEmpty()) {
             appScope.launch(Dispatchers.IO) {
@@ -235,13 +212,7 @@ class FilesManager(
     }
 
     fun createChatTextFile(text: String): UIMessagePart.Document {
-        val dir = context.filesDir.resolve(FileFolders.UPLOAD)
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
-        val fileName = buildUuidFileName(displayName = "pasted_text.txt", mimeType = "text/plain")
-        val file = dir.resolve(fileName)
-        file.writeText(text)
+        val file = storeBytes(FileFolders.UPLOAD, text.toByteArray(), "pasted_text.txt", "text/plain")
         trackManagedFile(
             folder = FileFolders.UPLOAD,
             file = file,
@@ -340,7 +311,7 @@ class FilesManager(
         var inserted = 0
         val diskRelativePaths = HashSet<String>()
         diskFiles.forEach { file ->
-            val relativePath = "${folder}/${file.name}"
+            val relativePath = "$folder/${file.name}"
             diskRelativePaths.add(relativePath)
             val existing = repository.getByPath(relativePath)
             if (existing == null) {
@@ -440,20 +411,61 @@ class FilesManager(
         return File(dir, FileUtils.buildUuidFileName(displayName = displayName, mimeType = mimeType))
     }
 
+    private fun ensureFolder(folder: String): File = File(context.filesDir, folder).also {
+        if (!it.exists()) it.mkdirs()
+    }
+
+    /**
+     * 把内容写进 [folder]，文件名用内容 hash。
+     *
+     * 同一份内容只落一份：目标已存在就直接复用，不重写。这是去重的落点，引用仍然是指向这个
+     * 文件的绝对路径，消费方不需要知道名字的来历。先写临时文件再改名，中途失败不会留下
+     * 半个文件被当成已有的那份。
+     */
+    private fun storeStream(
+        folder: String,
+        input: InputStream,
+        displayName: String?,
+        mimeType: String?,
+    ): File = ContentAddressedStore.storeStream(
+        ensureFolder(folder),
+        input,
+        FileUtils.extensionOf(displayName, mimeType),
+    )
+
+    private fun storeBytes(
+        folder: String,
+        bytes: ByteArray,
+        displayName: String?,
+        mimeType: String?,
+    ): File = ContentAddressedStore.storeBytes(
+        ensureFolder(folder),
+        bytes,
+        FileUtils.extensionOf(displayName, mimeType),
+    )
+
     private fun buildUuidFileName(displayName: String?, mimeType: String?): String =
         FileUtils.buildUuidFileName(displayName, mimeType)
 
+    /**
+     * 登记一个被管理的文件。
+     *
+     * 按内容命名之后同一份内容可能被反复登记，已经有一行就直接返回它：`managed_files` 的
+     * `relative_path` 是唯一索引，用 REPLACE 会把 id 换掉，别处如果记着旧 id 就对不上了。
+     */
     private suspend fun createManagedFileEntity(
         folder: String,
         file: File,
         displayName: String,
         mimeType: String,
     ): ManagedFileEntity {
+        val relativePath = buildRelativePath(folder, file)
+        repository.getByPath(relativePath)?.let { return it }
         val now = System.currentTimeMillis()
         return repository.insert(
             ManagedFileEntity(
                 folder = folder,
-                relativePath = buildRelativePath(folder, file),
+                relativePath = relativePath,
                 displayName = displayName,
                 mimeType = mimeType,
                 sizeBytes = file.length(),

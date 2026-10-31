@@ -15,7 +15,26 @@ import kotlin.uuid.Uuid
 object FileUtils {
     private const val TAG = "FileUtils"
 
-    fun buildUuidFileName(displayName: String?, mimeType: String?): String {
+    fun buildUuidFileName(displayName: String?, mimeType: String?): String =
+        "${Uuid.random()}.${extensionOf(displayName, mimeType)}"
+
+    /**
+     * 按内容 hash 命名。
+     *
+     * 同一份内容永远得到同一个名字，所以天然去重：写之前先看目标文件在不在，在就直接复用。
+     * 引用仍然是指向这个文件的绝对路径，消费方不需要知道名字的来历。
+     */
+    fun buildContentFileName(contentHash: String, displayName: String?, mimeType: String?): String =
+        "$contentHash.${extensionOf(displayName, mimeType)}"
+
+    /** 判断一个文件名是不是内容寻址的（用于清理时识别哪些是 hash 命名的存量文件） */
+    fun contentHashOfFileName(name: String): String? =
+        name.substringBeforeLast('.', "").takeIf { it.length == 64 && it.all(::isHex) }
+
+    private fun isHex(c: Char): Boolean =
+        c in '0'..'9' || c in 'a'..'f'
+
+    fun extensionOf(displayName: String?, mimeType: String?): String {
         val extFromName = displayName
             ?.substringAfterLast('.', "")
             ?.takeIf { it.isNotBlank() && it != displayName }
@@ -24,8 +43,7 @@ object FileUtils {
             ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it.lowercase()) }
             ?.takeIf { it.isNotBlank() }
             ?.lowercase()
-        val ext = extFromName ?: extFromMime ?: "bin"
-        return "${Uuid.random()}.$ext"
+        return extFromName ?: extFromMime ?: "bin"
     }
 
     fun buildRelativePath(folder: String, file: File): String =
@@ -122,7 +140,7 @@ object FileUtils {
                 "heic", "heix", "heim", "heis",
                 "hevc", "hevx", "hevm", "hevs",
                 "mif1", "msf1", "heif",
-                    -> return "image/heic"
+                -> return "image/heic"
 
                 "avif", "avis" -> return "image/avif"
             }
