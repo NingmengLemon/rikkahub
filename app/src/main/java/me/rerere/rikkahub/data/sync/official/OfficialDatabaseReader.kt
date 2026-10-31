@@ -138,7 +138,7 @@ internal class OfficialDatabaseReader private constructor(
  */
 internal class OfficialRow(
     val tableName: String,
-    val values: Map<String, Any?>,
+    private val values: Map<String, Any?>,
 ) {
     fun value(columnName: String): Any? = values[columnName]
 

@@ -95,7 +95,7 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 - `message_node` 的 `node_index`、`select_index` 与 id 原样保留。`ConversationEntity.nodes` 是遗留空列（v12 起恒为 `"[]"`，树在 `message_node` 里），照抄即可。
 - 自增表（`GenMediaEntity`、`managed_files`、`usage_record`）显式写 id；SQLite 会自己把 `sqlite_sequence` 提到显式 id 之上。
 - JSON 字段（`UIMessage`、`config`、`toolApprovals` 等）原样搬运，不解析再序列化。解析会丢未知字段，也会把官方的格式变化变成我们这边的转换错误。
-- 官方有、我们没有的列：拒绝导入这一版，不按默认值硬填（没有默认值的 NOT NULL 列本来也插不进去）。我们有、官方没有的列按声明默认值填。
+- 快照里有、我们当前的 `@Entity` 没有的列：拒绝导入这一版，不按默认值硬填。写入层目前只按快照列写，这项对账等字段映射层落地时一起做；现在双方同为 v32，不可达。我们是官方没有的列按声明默认值填。
 - 字段级语义：每个支持的官方版本带一份映射表，逐列写清「直接照抄」还是「需要转换」，并配一条完整性测试，保证表里覆盖了该版本快照的每一列。分叉之后只改这张表，不改读取层。现在两边没有分叉，整张表都是「直接照抄」。
 
 ## settings
@@ -189,7 +189,7 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 - 归档里「存在但为空」的附件目录无法表达：写归档的侧不写目录条目，读归档的侧也会跳过目录条目，所以空目录与「没有这个目录」在 payload 里长得一样，替换时会退化成合并。`skills/` 被清空后留下的空目录会被 `SkillManager` 当成待清理目录。
 - `upload/` 与 `fonts/` 在导出侧只收顶层文件，替换侧却是递归删除。payload 同时带数据库时，live 里这两个目录下的子目录文件会被删掉，因为它们不可能出现在任何 payload 里。这符合替换语义，但值得知道。
 - `media_creation/` 下的 `.part` 临时文件导出时被跳过，替换时会当成「备份里没有」而删除。它们是半成品，删掉通常无害，但下载中的任务会受影响。
-- 当前设备上 androidTest 跑不起来：测试进程解析不到读取层的新类，已确认不是代码问题（类在 APK 里、设备 APK 与构建产物 md5 一致、应用本身能正常启动）。结构与类型判断抽成纯函数之后可以走 JVM 测试，碰 SQLite 的那部分等设备问题解决再验证。
+- 设备上跑 androidTest 时曾遇到测试进程解析不到新类，查下来是 `adb push` 没有覆盖设备上的旧文件，装的一直是旧 APK：推送前先删掉远端文件再装即可。记在这里是因为排查花了不少时间，不是代码问题。
 - 真正的官方备份样本还没拿到，读取层的正向测试暂时用应用自己创建的库当替身。
 - live 文件名里带反斜杠会让整次导入失败。校验放在 `buildRemovalEntries` 里、journal 落地之前，所以失败会走 `failed-*` 分支：用户看到「已保留原数据」，下次启动不会重播。漏掉这层校验的话，`apply` 会反复抛异常，而 `RikkaHubApp` 只捕获 `RestoreFailedException`，结果是每次启动都崩。这种文件名不需要 root 就能产生：`FileUtils` 从 provider 的 displayName 取扩展名，`foo.\x` 会拼出带反斜杠的名字。
 - 归档目前在应用内取不回来，需要 root 或 adb。

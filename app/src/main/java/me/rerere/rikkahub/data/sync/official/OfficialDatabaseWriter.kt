@@ -40,7 +40,7 @@ internal class OfficialDatabaseWriter(
     private fun insert(table: OfficialDatabaseSchema.Table, row: OfficialRow) {
         val values = ContentValues(table.columns.size)
         for (column in table.columns) {
-            when (val value = row.values[column.name]) {
+            when (val value = row.value(column.name)) {
                 null -> Unit
                 is Long -> values.put(column.name, value)
                 is Double -> values.put(column.name, value)
@@ -49,6 +49,8 @@ internal class OfficialDatabaseWriter(
                 else -> error("未知的列值类型：${table.name}.${column.name} = ${value::class}")
             }
         }
-        database.insert(table.name, SQLiteDatabase.CONFLICT_ABORT, values)
+        val rowId = database.insert(table.name, SQLiteDatabase.CONFLICT_ABORT, values)
+        // requery 的实现在失败时抛异常，这里是兜底，防止哪次换实现后静默丢行
+        check(rowId != -1L) { "插入 ${table.name} 失败" }
     }
 }

@@ -72,7 +72,7 @@ class OfficialDatabaseWriterTest {
         }
         assertEquals(0, written)
         OfficialDatabaseReader.open(target).use { reader ->
-            assertTrue(reader.rows("workspaces").count() == 0)
+            assertEquals(0, reader.rows("workspaces").count())
         }
     }
 
