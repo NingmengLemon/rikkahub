@@ -15,7 +15,7 @@ internal object OfficialTableOrder {
      * @param tables 默认是冻结快照；测试可以传一份人为乱序的定义，验证排序确实在按外键推
      */
     fun insertionOrder(
-        tables: Map<String, OfficialDatabaseSchema.Table> = OfficialDatabaseSchema.TABLES,
+        tables: Map<String, OfficialSchemaTypes.Table> = OfficialDatabaseSchema.TABLES,
     ): List<String> {
         val ordered = ArrayList<String>(tables.size)
         val visiting = HashSet<String>()

@@ -54,7 +54,7 @@ class OfficialTableOrderTest {
         assertTrue(error?.message.orEmpty().contains("循环外键"))
     }
 
-    private fun table(name: String, foreignKeyTo: String? = null) = OfficialDatabaseSchema.Table(
+    private fun table(name: String, foreignKeyTo: String? = null) = OfficialSchemaTypes.Table(
         name = name,
         primaryKey = emptyList(),
         autoIncrement = false,
@@ -62,7 +62,7 @@ class OfficialTableOrderTest {
         indices = emptyList(),
         foreignKeys = listOfNotNull(
             foreignKeyTo?.let {
-                OfficialDatabaseSchema.ForeignKey(
+                OfficialSchemaTypes.ForeignKey(
                     table = it,
                     columns = listOf("parent_id"),
                     referencedColumns = listOf("id"),

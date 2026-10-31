@@ -25,8 +25,8 @@ internal class OfficialDatabaseWriter(
         var written = 0
         database.beginTransaction()
         try {
-            for (tableName in OfficialTableOrder.insertionOrder()) {
-                val table = OfficialDatabaseSchema.TABLES.getValue(tableName)
+            for (tableName in OfficialTableOrder.insertionOrder(reader.tables)) {
+                val table = reader.tables.getValue(tableName)
                 reader.forEachRow(tableName) { row ->
                     insert(table, row)
                     written++
@@ -39,7 +39,7 @@ internal class OfficialDatabaseWriter(
         return written
     }
 
-    private fun insert(table: OfficialDatabaseSchema.Table, row: OfficialRow) {
+    private fun insert(table: OfficialSchemaTypes.Table, row: OfficialRow) {
         val values = ContentValues(table.columns.size)
         for (column in table.columns) {
             when (val value = row.value(column.name)) {

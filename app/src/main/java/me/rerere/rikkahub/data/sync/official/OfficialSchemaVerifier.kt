@@ -1,9 +1,10 @@
 package me.rerere.rikkahub.data.sync.official
 
 /**
- * 官方库与冻结快照的结构对账，不依赖 Android。
+ * 官方库与某一版快照的结构对账，不依赖 Android。
  *
  * 拆出来是为了能在 JVM 上直接验证：读取层拿 `PRAGMA table_info` 的结果喂进来，这里只做判断。
+ * 版本选择在读取层做（按 `user_version` 取 [OfficialSnapshots] 里的那份），所以这里不判断版本。
  */
 internal object OfficialSchemaVerifier {
 
@@ -15,14 +16,15 @@ internal object OfficialSchemaVerifier {
     }
 
     /**
+     * @param tables 选中的那一版快照的表定义
      * @param liveColumns 每张表实际的列名；缺表时该表不出现
      */
-    fun verify(version: Int, liveColumns: Map<String, List<String>>): Verdict {
-        if (version != OfficialDatabaseSchema.VERSION) {
-            return Verdict.Failed("官方库版本 v$version 与快照 v${OfficialDatabaseSchema.VERSION} 不一致")
-        }
+    fun verify(
+        tables: Map<String, OfficialSchemaTypes.Table>,
+        liveColumns: Map<String, List<String>>,
+    ): Verdict {
         val unexpected = LinkedHashMap<String, List<String>>()
-        for ((name, table) in OfficialDatabaseSchema.TABLES) {
+        for ((name, table) in tables) {
             val actual = liveColumns[name] ?: return Verdict.Failed("官方库里没有表 $name")
             val expected = table.columns.map { it.name }
             val missing = expected.filter { it !in actual }

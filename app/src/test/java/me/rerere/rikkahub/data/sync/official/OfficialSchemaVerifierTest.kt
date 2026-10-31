@@ -1,6 +1,8 @@
 package me.rerere.rikkahub.data.sync.official
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -14,7 +16,7 @@ class OfficialSchemaVerifierTest {
     }
 
     @Test fun `accepts a snapshot shaped database`() {
-        val verdict = OfficialSchemaVerifier.verify(OfficialDatabaseSchema.VERSION, allColumns())
+        val verdict = OfficialSchemaVerifier.verify(OfficialDatabaseSchema.TABLES, allColumns())
         assertTrue("结构一致时应当通过，实际是 $verdict", verdict is OfficialSchemaVerifier.Verdict.Ok)
         assertTrue((verdict as OfficialSchemaVerifier.Verdict.Ok).unexpectedColumns.isEmpty())
     }
@@ -23,7 +25,7 @@ class OfficialSchemaVerifierTest {
         val live = allColumns().toMutableMap().apply {
             this["workspaces"] = this.getValue("workspaces") + "future_column"
         }
-        val verdict = OfficialSchemaVerifier.verify(OfficialDatabaseSchema.VERSION, live)
+        val verdict = OfficialSchemaVerifier.verify(OfficialDatabaseSchema.TABLES, live)
         assertTrue(verdict is OfficialSchemaVerifier.Verdict.Ok)
         assertEquals(
             listOf("future_column"),
@@ -33,7 +35,7 @@ class OfficialSchemaVerifierTest {
 
     @Test fun `fails when a table is missing`() {
         val live = allColumns().toMutableMap().apply { remove("message_node") }
-        val verdict = OfficialSchemaVerifier.verify(OfficialDatabaseSchema.VERSION, live)
+        val verdict = OfficialSchemaVerifier.verify(OfficialDatabaseSchema.TABLES, live)
         assertTrue(verdict is OfficialSchemaVerifier.Verdict.Failed)
         assertTrue((verdict as OfficialSchemaVerifier.Verdict.Failed).reason.contains("没有表 message_node"))
     }
@@ -42,15 +44,9 @@ class OfficialSchemaVerifierTest {
         val live = allColumns().toMutableMap().apply {
             this["workspaces"] = this.getValue("workspaces") - "root"
         }
-        val verdict = OfficialSchemaVerifier.verify(OfficialDatabaseSchema.VERSION, live)
+        val verdict = OfficialSchemaVerifier.verify(OfficialDatabaseSchema.TABLES, live)
         assertTrue(verdict is OfficialSchemaVerifier.Verdict.Failed)
         assertTrue((verdict as OfficialSchemaVerifier.Verdict.Failed).reason.contains("缺少列 root"))
-    }
-
-    @Test fun `fails when the schema version differs`() {
-        val verdict = OfficialSchemaVerifier.verify(OfficialDatabaseSchema.VERSION + 1, allColumns())
-        assertTrue(verdict is OfficialSchemaVerifier.Verdict.Failed)
-        assertTrue((verdict as OfficialSchemaVerifier.Verdict.Failed).reason.contains("版本"))
     }
 
     @Test fun `field type accepts the matching storage class only`() {
@@ -68,10 +64,20 @@ class OfficialSchemaVerifierTest {
         assertTrue(!OfficialFieldType.accepts("NUMERIC", OfficialFieldType.INTEGER))
     }
 
-    @Test fun `checks the version before any table`() {
-        // 表全缺、版本也不对时，报的应当是版本：版本是分流的前提，先于结构
-        val verdict = OfficialSchemaVerifier.verify(OfficialDatabaseSchema.VERSION + 1, emptyMap())
-        assertTrue(verdict is OfficialSchemaVerifier.Verdict.Failed)
-        assertTrue((verdict as OfficialSchemaVerifier.Verdict.Failed).reason.contains("版本"))
+    @Test fun `registers the versions we support and rejects the rest`() {
+        // v31 与 v32 是已知官方版本；v16 那份样本太旧，明确不支持
+        assertNotNull(OfficialSnapshots.forVersion(31))
+        assertNotNull(OfficialSnapshots.forVersion(32))
+        assertNull(OfficialSnapshots.forVersion(16))
+        assertNull(OfficialSnapshots.forVersion(33))
+    }
+
+    @Test fun `each snapshot version matches its own tables`() {
+        // 版本号必须与快照内容一致，否则读取层会拿错结构去读
+        for ((version, snapshot) in OfficialSnapshots.BY_VERSION) {
+            assertEquals(version, snapshot.version)
+            assertTrue("v$version 的快照不该是空的", snapshot.tables.isNotEmpty())
+            assertTrue("v$version 的 identity 不该是空的", snapshot.identityHash.isNotBlank())
+        }
     }
 }

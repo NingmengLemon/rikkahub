@@ -21,7 +21,12 @@ import java.io.File
  */
 internal class OfficialDatabaseReader private constructor(
     private val database: SQLiteDatabase,
+    /** 按库里的 `user_version` 选中的那一版结构 */
+    val snapshot: OfficialSnapshot,
 ) : Closeable {
+
+    /** 这一版快照的表定义，写入层按它构造 */
+    val tables: Map<String, OfficialSchemaTypes.Table> get() = snapshot.tables
 
     /** 库里有、快照里没有的列，诊断用 */
     val unexpectedColumns: Map<String, List<String>> = verifySchema()
@@ -34,7 +39,7 @@ internal class OfficialDatabaseReader private constructor(
      * 拿不准的话用 [forEachRow]。读到的每一行都自带值，序列结束后仍然可读。
      */
     fun rows(tableName: String): Sequence<OfficialRow> {
-        val table = requireNotNull(OfficialDatabaseSchema.TABLES[tableName]) {
+        val table = requireNotNull(snapshot.tables[tableName]) {
             "未知的官方表：$tableName"
         }
         val projection = table.columns.joinToString(",") { "`${it.name}`" }
@@ -52,13 +57,13 @@ internal class OfficialDatabaseReader private constructor(
     }
 
     private fun verifySchema(): Map<String, List<String>> {
-        val liveColumns = OfficialDatabaseSchema.TABLES.keys.associateWith { name ->
+        val liveColumns = snapshot.tables.keys.associateWith { name ->
             database.rawQuery("PRAGMA table_info(`$name`)", null).use { cursor ->
                 buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
             }
         }.filterValues { it.isNotEmpty() }
 
-        return when (val verdict = OfficialSchemaVerifier.verify(database.version, liveColumns)) {
+        return when (val verdict = OfficialSchemaVerifier.verify(snapshot.tables, liveColumns)) {
             is OfficialSchemaVerifier.Verdict.Ok -> {
                 verdict.unexpectedColumns.forEach { (table, columns) ->
                     Log.w(TAG, "官方表 $table 有快照之外的列 ${columns.joinToString()}，已忽略")
@@ -76,7 +81,7 @@ internal class OfficialDatabaseReader private constructor(
      * [OfficialRow] 如果在 Sequence 消费完之后还被持有，带着 cursor 的版本会直接越界；官方
      * 数据要跨阶段使用（校验、转换），所以行对象必须自包含。
      */
-    private fun cursorToRows(cursor: Cursor, table: OfficialDatabaseSchema.Table): Sequence<OfficialRow> = sequence {
+    private fun cursorToRows(cursor: Cursor, table: OfficialSchemaTypes.Table): Sequence<OfficialRow> = sequence {
         try {
             val indices = table.columns.map { it.name to cursor.getColumnIndexOrThrow(it.name) }
             while (cursor.moveToNext()) {
@@ -91,7 +96,7 @@ internal class OfficialDatabaseReader private constructor(
         }
     }
 
-    private fun readValue(cursor: Cursor, index: Int, columnName: String, table: OfficialDatabaseSchema.Table): Any {
+    private fun readValue(cursor: Cursor, index: Int, columnName: String, table: OfficialSchemaTypes.Table): Any {
         val column = requireNotNull(table.columns.firstOrNull { it.name == columnName }) {
             "快照里没有列 ${table.name}.$columnName"
         }
@@ -121,7 +126,11 @@ internal class OfficialDatabaseReader private constructor(
             )
             // 校验失败时要把刚打开的库关掉，否则 fd 要等 finalize 才释放
             return try {
-                OfficialDatabaseReader(database)
+                val version = database.version
+                val snapshot = requireNotNull(OfficialSnapshots.forVersion(version)) {
+                    "未知的官方版本 v$version，已知：${OfficialSnapshots.BY_VERSION.keys.sorted()}"
+                }
+                OfficialDatabaseReader(database, snapshot)
             } catch (e: Exception) {
                 database.close()
                 throw e
@@ -133,7 +142,7 @@ internal class OfficialDatabaseReader private constructor(
 /**
  * 一行官方数据。
  *
- * 带表名与列值，值按 [OfficialDatabaseSchema.Column] 的 affinity 在读取时就转好类型，调用方
+ * 带表名与列值，值按 [OfficialSchemaTypes.Column] 的 affinity 在读取时就转好类型，调用方
  * 拿到的是确定的类型；行对象不依赖 cursor，Sequence 结束之后仍然可读。
  */
 internal class OfficialRow(
