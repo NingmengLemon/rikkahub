@@ -77,7 +77,7 @@ C8 与 C9 删的是完整实现而不是入口。这两项功能各自独立成�
 
 ### 数据结构
 
-数据结构的冻结已解除：官方备份的导入器已实现，并在一组固定的样本上验证通过，判据与样本类别见 [`backup/acceptance.md`](backup/acceptance.md)。改 Room schema 与 `Settings` 结构不再需要额外的门禁。
+数据结构的冻结已解除：官方备份的导入器已实现，并在真实样本上验到了主要判据（表数据、转换产物、附件、settings）。逐类的覆盖状态与缺口见 [`backup/acceptance.md`](backup/acceptance.md)。改 Room schema 与 `Settings` 结构不再需要额外的门禁。
 
 解除之后仍然成立的是对自家历史数据的兼容。这几条与导入器无关，不会随冻结一起消失：
 

@@ -27,7 +27,7 @@ upload/ skills/ fonts/ media_creation/     附件，可选择不备份
 `stageRestore` 在暂存阶段就把库打开并迁移，不是等到启动：
 
 1. 解压归档到 `PendingRestore.createStagingDirectory()` 出来的 `preparing-*` 目录。
-2. 对暂存库跑 `DatabaseBackup.normalize`，然后用 `AppDatabaseFactory.create(context, stagedDatabase.absolutePath)` 打开它。Room 在这里校验 identity hash，并沿迁移链把低版本库升到当前版本；版本高于本仓库时走 `onDowngrade` 抛错。
+2. 对暂存库跑 `DatabaseBackup.normalize`，然后用 `AppDatabaseFactory.create(context, stagedDatabase.absolutePath)` 打开它。Room 在这里校验 identity hash，并沿迁移链把低版本库升到当前版本。版本高于本仓库的库在下一步之前就被分流拒绝了，只有元数据读不出来时才会落到 Room 的 `onDowngrade` 抛错。
 3. 在 `try` 里 `DatabaseBackup.checkpoint(room.openHelper.writableDatabase)` 把 WAL 合进主文件，`finally` 里 `room.close()`，最后 `removeSidecars` 清掉 `-wal`/`-shm`。
 4. `PendingRestore.publish(staging)`：只把 `preparing-*` 改名为 `pending`，此时还没落盘。
 5. 重启后 `PendingRestore.apply` 在 Koin、Room、SettingsStore 初始化之前建 journal、原子替换文件；失败则整体 rollback。
@@ -58,7 +58,7 @@ version == ourVersion：
 - `ourVersion` 与 `ourIdentity` 都用编译进应用的常量，不从活库读。升级后首次启动时活库可能还停在旧版本，读它会把官方新版本误判成「版本更高」；全新安装时活库文件可能还不存在。
 - 「版本低、identity 未知」交给迁移链试，那可能是自家旧库，也可能是结构兼容的官方旧库。迁移链打不开时会明确失败，不会写坏数据。
 
-还有一种三种判定都拦不住的：两边 DDL 与 identity 都一样，但我们改了某个字段的含义。Room 会照常打开，读出来的是错的。identity 是 schema 的 hash，不含字段语义，所以它不会因为语义变化而变，任何基于 header 的判定都识别不出这一种。它只能靠改字段时同步维护写入侧的字段映射来保证，属于流程约束，不是机制保证；映射的现状见 [`importer.md`](importer.md)。
+还有一种三种判定都拦不住的：两边 DDL 与 identity 都一样，但我们改了某个字段的含义。Room 会照常打开，读出来的是错的。identity 是 schema 的 hash，不含字段语义，所以它不会因为语义变化而变，任何基于 header 的判定都识别不出这一种。它只能靠流程约束兜住，具体规则见 [`../README.md`](../README.md) 的「数据结构」一节。
 
 这张表只描述 `OfficialRestorePlanner`。另有一种情况在判定之后还要再分一次流：同版本、同 identity，但库里的文本列还带着别的安装的 `file://` 前缀，官方备份与我们别的包名（debug、release、改包名前的构建）产出的备份都是这样。`OfficialForeignAttachmentPaths` 会探一次，命中就改走转换器重写路径（C25）。
 
