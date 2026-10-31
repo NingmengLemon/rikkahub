@@ -121,13 +121,14 @@ This repository carries personal customizations on top of upstream `rikkahub/rik
   `docs/custom/build.md` / `docs/custom/locale.md` the build and string-resource operations.
 - Tag customization commits with the `custom` scope, e.g. `feat(custom): ...`, and add the item to
   `docs/custom/checklist.md` (an index row plus a detail section) so a later upstream merge can be checked against it.
-- The persisted-data freeze is lifted: the official-backup importer exists and passes the acceptance criteria on the real
-  samples, so Room schema changes and `Settings` structure changes are allowed. What still holds is backwards
+- The persisted-data freeze is lifted: the official-backup importer exists and the inbound criteria pass on the real
+  samples (v32 and v31 tables and converted output, v32 attachments and settings). Two gaps remain and are recorded in
+  `docs/custom/backup/acceptance.md`: v31 attachments were not compared one by one, and the official-compatible export
+  is not implemented. Room schema changes and `Settings` structure changes are allowed. What still holds is backwards
   compatibility with our own past builds: a Room change ships with its migration, new serialized fields carry a
   default, existing field and DataStore key meanings do not change, and the acceptance samples are re-run afterwards.
   Changing a meaning would first need a field-mapping table, which does not exist yet. The data-structure section of
-  `docs/custom/README.md` lists the constraints; `docs/custom/backup/acceptance.md` records which sample class covers
-  what and which gaps remain.
+  `docs/custom/README.md` lists the constraints.
 - A Room schema change also makes the official-compatible export fail until its trimming logic exists (see C18). That
   failure is deliberate, not a bug.
 - Prefer disabling an entry point over deleting an implementation, so upstream merges stay cheap. This is a

@@ -1,11 +1,11 @@
 # 备份与恢复
 
-官方客户端与本应用的备份是同一种自包含 zip，恢复也共用同一条 `BackupManager.stageRestore`。本目录记这条链路的现状、结构分叉之后的转换路径，以及验收方式。
+官方客户端与本应用的备份是同一种自包含 zip，恢复也共用同一条 `BackupManager.stageRestore`。本目录记这条链路的现状、转换路径（把别的安装的库读出来、改写成本机的结构与路径），以及验收方式。
 
 | 文档 | 内容 |
 | --- | --- |
 | `README.md` | 归档格式、恢复流程、分流判据、附件替换、原件归档、索引重建、已知限制 |
-| `importer.md` | 结构分叉后的转换：接入方式、读取层、写入、附件路径重写、settings |
+| `importer.md` | 转换：两条入口、接入方式、读取层、写入、附件路径重写、settings |
 | `acceptance.md` | 验收判据、样本类别、规范化规则、跑法、当前覆盖范围 |
 
 ## 归档格式
@@ -27,14 +27,17 @@ upload/ skills/ fonts/ media_creation/     附件，可选择不备份
 `stageRestore` 在暂存阶段就把库打开并迁移，不是等到启动：
 
 1. 解压归档到 `PendingRestore.createStagingDirectory()` 出来的 `preparing-*` 目录。
-2. 对暂存库跑 `DatabaseBackup.normalize`，然后用 `AppDatabaseFactory.create(context, stagedDatabase.absolutePath)` 打开它。Room 在这里校验 identity hash，并沿迁移链把低版本库升到当前版本。版本高于本仓库的库在下一步之前就被分流拒绝了，只有元数据读不出来时才会落到 Room 的 `onDowngrade` 抛错。
-3. 在 `try` 里 `DatabaseBackup.checkpoint(room.openHelper.writableDatabase)` 把 WAL 合进主文件，`finally` 里 `room.close()`，最后 `removeSidecars` 清掉 `-wal`/`-shm`。
-4. `PendingRestore.publish(staging)`：只把 `preparing-*` 改名为 `pending`，此时还没落盘。
-5. 重启后 `PendingRestore.apply` 在 Koin、Room、SettingsStore 初始化之前建 journal、原子替换文件；失败则整体 rollback。
+2. 对暂存库跑 `DatabaseBackup.normalize`，把源库的 `-wal` 合进主文件。
+3. 分流：只读 `user_version` 与 `room_master_table` 的指纹，判定迁移链 / 转换 / 拒绝（见下一节）。判为迁移链时还会探一次附件路径，带着别的安装的 `file://` 前缀就改走转换器。
+4. 需要转换时，先把官方库读出来写进一份新建的当前版本库，用它替换暂存库（见 [`importer.md`](importer.md)）。
+5. 用 `AppDatabaseFactory.create(context, stagedDatabase.absolutePath)` 打开暂存库。Room 在这里校验 identity hash，并沿迁移链把低版本库升到当前版本。版本高于本仓库的库在前一步就被拒绝了，只有元数据读不出来时才会落到 Room 的 `onDowngrade` 抛错。
+6. 在 `try` 里 `DatabaseBackup.checkpoint(room.openHelper.writableDatabase)` 把 WAL 合进主文件，`finally` 里 `room.close()`，最后 `removeSidecars` 清掉 `-wal`/`-shm`。
+7. `PendingRestore.publish(staging)`：只把 `preparing-*` 改名为 `pending`，此时还没落盘。
+8. 重启后 `PendingRestore.apply` 在 Koin、Room、SettingsStore 初始化之前建 journal、原子替换文件；失败则整体 rollback。
 
 失败都在 publish 之前发生，staging 在 `finally` 里删掉，不会污染正在用的数据。
 
-同一个 zip 换到另一个安装（官方版、我们的 debug 或 release、旧包名的构建）上恢复时，迁移链不改数据，库里留着的还是生产者那一侧的绝对 `file://` 路径，附件会全部失配。这种情况在分流之后还要再分一次流，见下一节。
+同一个 zip 换到另一个安装（官方版、我们的 debug 或 release、旧包名的构建）上恢复时，迁移链不改数据，库里留着的还是生产者那一侧的绝对 `file://` 路径，附件会全部失配。这种情况在分流时就被改道，见下一节。
 
 ## 分流
 
@@ -60,7 +63,7 @@ version == ourVersion：
 
 还有一种三种判定都拦不住的：两边 DDL 与 identity 都一样，但我们改了某个字段的含义。Room 会照常打开，读出来的是错的。identity 是 schema 的 hash，不含字段语义，所以它不会因为语义变化而变，任何基于 header 的判定都识别不出这一种。它只能靠流程约束兜住，具体规则见 [`../README.md`](../README.md) 的「数据结构」一节。
 
-这张表只描述 `OfficialRestorePlanner`。另有一种情况在判定之后还要再分一次流：同版本、同 identity，但库里的文本列还带着别的安装的 `file://` 前缀，官方备份与我们别的包名（debug、release、改包名前的构建）产出的备份都是这样。`OfficialForeignAttachmentPaths` 会探一次，命中就改走转换器重写路径（C25）。
+这张表只描述 `OfficialRestorePlanner`。判为迁移链之后还有一次探测：`OfficialForeignAttachmentPaths` 会扫一遍快照覆盖的文本列，看有没有别的安装的 `file:///data/.../files/` 前缀，命中就改走转换器重写路径（C25）。探测的对象是「判为迁移链的库」，也就是版本低于我们的库，以及版本相同、identity 相同的库；带附件引用的官方备份与我们别的包名（debug、release、改包名前的构建）产出的备份都会命中。没有附件引用、或者路径本来就属于当前安装（同一包名、同一用户号）的备份不命中，照常走迁移链。
 
 ## 附件替换
 
