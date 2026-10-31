@@ -351,7 +351,6 @@ private fun RecoveryPage(vm: DebugVM) {
     }
 }
 
-
 @Composable
 private fun ColorsPage() {
     val colorScheme = MaterialTheme.colorScheme

@@ -126,25 +126,19 @@ fun SettingFilesPage(
             text = {
                 Text(
                     target.displayName + "\n\n" +
-                        "附件按内容只存一份，同一个文件可能同时被多条消息、助手头像或收藏引用。" +
-                        "确认后会先查一遍引用：已经没人用时连磁盘文件一起删掉；还有引用时只把它从" +
-                        "这个列表里移除，文件保留。"
+                        "只从这个列表里移除，磁盘文件保留。原因是附件按内容只存一份，同一个文件可能" +
+                        "同时被多条消息、助手头像或收藏引用；输入框里还没发送的附件也只存在内存里，" +
+                        "这里查不到。要回收空间请看工具条上的扫描入口。"
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         scope.launch {
-                            val relativePath = target.relativePath
-                            val outcome = runCatching {
-                                attachmentCleanup.deleteIfUnreferenced(relativePath)
-                            }.getOrNull()
-                            val removed = filesManager.delete(target.id)
-                            when {
-                                outcome == null -> toaster.show(deleteFailedToast)
-                                outcome == AttachmentCleanup.Outcome.DELETED -> toaster.show(deletedToast)
-                                !removed -> toaster.show(deleteFailedToast)
-                                else -> toaster.show("还有地方引用这个附件，已从列表移除、文件保留")
+                            if (filesManager.delete(target.id)) {
+                                toaster.show("已从列表移除，磁盘文件保留")
+                            } else {
+                                toaster.show(deleteFailedToast)
                             }
                             pendingDelete = null
                         }

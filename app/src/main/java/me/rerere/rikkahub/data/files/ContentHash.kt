@@ -3,6 +3,7 @@ package me.rerere.rikkahub.data.files
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
+
 /**
  * 文件内容的指纹。
  *

@@ -63,35 +63,6 @@ class AttachmentCleanup(
         Report(orphaned = orphaned, reclaimableBytes = reclaimable, kept = kept)
     }
 
-    /** 删一个文件的结果。还被人引用时不删，只让调用方把它从列表里摘掉。 */
-    enum class Outcome { DELETED, STILL_REFERENCED, MISSING }
-
-    /**
-     * 没人引用了才删这一个文件。
-     *
-     * 逐个文件删是安全的：查引用是同步做完的，不依赖「最近写入」这类时间启发式。批量按时间
-     * 删不安全，所以没有对应的批量删除。
-     */
-    suspend fun deleteIfUnreferenced(relativePath: String): Outcome = withContext(Dispatchers.IO) {
-        val file = File(context.filesDir, relativePath)
-        if (!file.isFile) return@withContext Outcome.MISSING
-        val settings = settingsStore.awaitLoaded()
-        val avatarPaths = buildSet {
-            settings.assistants.forEach { assistant ->
-                (assistant.avatar as? Avatar.Image)?.url?.let(::add)
-                assistant.background?.let(::add)
-            }
-            (settings.displaySetting.userAvatar as? Avatar.Image)?.url?.let(::add)
-        }.mapNotNull { url -> url.substringAfter("/files/", "").takeIf { it.isNotEmpty() } }.toSet()
-        val favoriteJson = database.favoriteDao().listAll().first().joinToString("\n") {
-            it.refJson + "\n" + it.snapshotJson + "\n" + (it.metaJson ?: "")
-        }
-        if (isReferenced(relativePath, avatarPaths, favoriteJson)) {
-            return@withContext Outcome.STILL_REFERENCED
-        }
-        if (file.delete()) Outcome.DELETED else Outcome.MISSING
-    }
-
     /**
      * 候选在库里是否还被提到。
      *
@@ -105,9 +76,10 @@ class AttachmentCleanup(
         avatarPaths: Set<String>,
         favoriteJson: String,
     ): Boolean {
-        if (candidate in avatarPaths) return true
-        if (candidate in favoriteJson) return true
+        // 头像与背景在 settings 里也是编码过的 URL，所以裸路径与编码形态都要比
         val encoded = Uri.encode(candidate, "/")
+        if (candidate in avatarPaths || encoded in avatarPaths) return true
+        if (candidate in favoriteJson) return true
         if (encoded != candidate && encoded in favoriteJson) return true
         val dao = database.messageNodeDao()
         if (dao.hasFileReference(candidate)) return true

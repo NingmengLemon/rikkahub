@@ -389,6 +389,8 @@ class ConversationRepository(
             messageFtsManager.indexConversation(conversation)
             onProgress(index + 1, total)
         }
+        // 标记必须在全部会话写完才置位：中途被杀时留着 0，下次启动的自检才会重来
+        messageFtsManager.markRebuildFinished()
     }
 
     fun conversationToConversationEntity(conversation: Conversation): ConversationEntity {
