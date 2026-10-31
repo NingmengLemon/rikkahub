@@ -8,6 +8,7 @@ import me.rerere.rikkahub.data.db.AppDatabaseFactory
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -108,6 +109,31 @@ class OfficialDatabaseReaderTest {
             assertEquals(listOf("future_column"), reader.unexpectedColumns["workspaces"])
             // 多出来的列不影响读取
             assertTrue(reader.rows("workspaces").count() >= 0)
+        }
+    }
+
+    /**
+     * 读一份真实的官方 v32 备份里的库。
+     *
+     * 样本不在仓库里，也不进 APK：测试从设备上的固定路径读，没有就跳过（CI 上不会因此失败）。
+     * 路径用 `adb push` 放进去，见 `docs/custom/importer.md` 的验收一节。
+     */
+    @Test fun readsTheProvidedOfficialSample() {
+        val sample = File("/data/local/tmp/rikkahub-sample-v32.db")
+        assumeTrue("没有放官方样本，跳过", sample.isFile)
+
+        OfficialDatabaseReader.open(sample).use { reader ->
+            assertTrue("官方 v32 样本不该有快照之外的列", reader.unexpectedColumns.isEmpty())
+            assertEquals(168, reader.rows("ConversationEntity").count())
+            assertEquals(673, reader.rows("message_node").count())
+            assertEquals(97, reader.rows("managed_files").count())
+            assertEquals(476, reader.rows("usage_record").count())
+
+            // 附件引用是绝对 file:// URI，跨安装迁移时必须重写前缀
+            val attachmentRefs = reader.rows("message_node").count { row ->
+                row.string("messages")?.contains("file://") == true
+            }
+            assertTrue("样本里应当有指向 upload 的附件引用", attachmentRefs > 0)
         }
     }
 
