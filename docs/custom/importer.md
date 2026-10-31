@@ -95,6 +95,7 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 - `message_node` 的 `node_index`、`select_index` 与 id 原样保留。`ConversationEntity.nodes` 是遗留空列（v12 起恒为 `"[]"`，树在 `message_node` 里），照抄即可。
 - 自增表（`GenMediaEntity`、`managed_files`、`usage_record`）显式写 id；SQLite 会自己把 `sqlite_sequence` 提到显式 id 之上。
 - JSON 字段（`UIMessage`、`config`、`toolApprovals` 等）原样搬运，不解析再序列化。解析会丢未知字段，也会把官方的格式变化变成我们这边的转换错误。
+- 附件引用是绝对 `file://` URI，包名在路径里。写入文本列前要把 `file:///data/(user|data)/<任意>/<任意包名>/files/` 前缀换成当前应用的 files 目录，否则导入到改过包名的应用后附件全部失配。真实样本里有 9080 处消息引用、11 个助手头像、1 个用户头像用的是这个形式。只认这一种形状，不绑定包名；JSON 整段做字符串替换，不解析。
 - 快照里有、我们当前的 `@Entity` 没有的列：拒绝导入这一版，不按默认值硬填。写入层目前只按快照列写，这项对账等字段映射层落地时一起做；现在双方同为 v32，不可达。我们是官方没有的列按声明默认值填。
 - 字段级语义：每个支持的官方版本带一份映射表，逐列写清「直接照抄」还是「需要转换」，并配一条完整性测试，保证表里覆盖了该版本快照的每一列。分叉之后只改这张表，不改读取层。现在两边没有分叉，整张表都是「直接照抄」。
 
