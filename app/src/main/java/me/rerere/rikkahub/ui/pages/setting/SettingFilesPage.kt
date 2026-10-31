@@ -128,7 +128,7 @@ fun SettingFilesPage(
                 TextButton(
                     onClick = {
                         scope.launch {
-                            val ok = filesManager.delete(target.id, deleteFromDisk = true)
+                            val ok = filesManager.delete(target.id)
                             if (ok) {
                                 toaster.show(deletedToast)
                             } else {

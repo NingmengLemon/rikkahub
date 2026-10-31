@@ -1,6 +1,7 @@
 package me.rerere.rikkahub.data.sync
 
 import android.content.Context
+import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -30,6 +31,7 @@ import me.rerere.rikkahub.data.sync.official.OfficialDatabaseSchema
 import me.rerere.rikkahub.data.sync.official.OfficialRestorePlan
 import me.rerere.rikkahub.data.sync.official.OfficialRestorePlanner
 import me.rerere.rikkahub.data.sync.official.OfficialSnapshots
+import me.rerere.rikkahub.data.sync.official.OfficialUrlRewriter
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -207,7 +209,12 @@ class BackupManager(
 
                     val settingsFile = File(staging, SETTINGS_ENTRY)
                     if (settingsFile.exists()) {
-                        val migrated = SettingsJsonMigrator.migrate(settingsFile.readText())
+                        // 头像与背景是 settings 里的绝对 file:// 路径，包名写死在路径里；不重写的话
+                        // 导入到改过包名的安装之后，它们会整体断链。数据库那边由写入层重写。
+                        val filesUriPrefix = context.filesDir.toUri().toString().trimEnd('/') + "/"
+                        val migrated = SettingsJsonMigrator.migrate(
+                            OfficialUrlRewriter.rewriteEmbedded(settingsFile.readText(), filesUriPrefix)
+                        )
                         val settings = json.decodeFromString<Settings>(migrated)
                         require(!settings.init) { "Backup contains uninitialized settings" }
                         // Persist the migrated value once, including generated IDs, for restart/retry consistency.

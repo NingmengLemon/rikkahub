@@ -344,63 +344,40 @@ class FilesManager(
         SyncResult(inserted = inserted, removed = removed)
     }
 
-    suspend fun delete(id: Long, deleteFromDisk: Boolean = true): Boolean = withContext(Dispatchers.IO) {
-        val entity = repository.getById(id) ?: return@withContext false
-        if (deleteFromDisk) {
-            runCatching { getFile(entity).delete() }
-        }
+    /**
+     * 摘掉一条登记。
+     *
+     * 不删磁盘文件：附件按内容命名，同一份文件可能同时被多条消息、助手头像、用户头像引用，
+     * 删登记就顺手删文件会打断别处。空间回收统一由 [AttachmentCleanup] 扫引用后处理。
+     */
+    suspend fun delete(id: Long): Boolean = withContext(Dispatchers.IO) {
         repository.deleteById(id) > 0
     }
 
+    /**
+     * 清空一个目录的登记。
+     *
+     * 同样不删文件，理由见 [delete]。
+     */
     suspend fun deleteAll(folder: String = FileFolders.UPLOAD): Boolean = withContext(Dispatchers.IO) {
-        val dir = File(context.filesDir, folder)
-        val entries = dir.listFiles()
-        if (dir.exists() && entries == null) {
-            return@withContext false
-        }
-
-        var allDeletedFromDisk = true
-        entries.orEmpty().forEach { entry ->
-            if (!runCatching { entry.deleteRecursively() }.getOrDefault(false)) {
-                allDeletedFromDisk = false
-            }
-        }
-
-        if (allDeletedFromDisk) {
-            repository.deleteByFolder(folder)
-            return@withContext true
-        }
-
-        repository.listByFolder(folder).first().forEach { entity ->
-            if (!getFile(entity).exists()) {
-                repository.deleteById(entity.id)
-            }
-        }
-        false
+        repository.deleteByFolder(folder)
+        true
     }
 
+    /**
+     * 按首次入库时间清掉一批登记。
+     *
+     * 去重命中时会复用已有行，所以 `createdAt` 是「这份内容第一次出现的时间」，不是「最后一次
+     * 被使用的时间」；拿它当「很久没用了」的判据已经不成立，因此这里只清登记，不动文件。
+     */
     suspend fun deleteOlderThan(
         folder: String = FileFolders.UPLOAD,
         cutoffMillis: Long,
     ): Boolean = withContext(Dispatchers.IO) {
-        var allDeleted = true
         repository.listByFolder(folder).first()
             .filter { it.createdAt < cutoffMillis }
-            .forEach { entity ->
-                val file = getFile(entity)
-                val deletedFromDisk = !file.exists() || runCatching {
-                    file.deleteRecursively()
-                }.getOrDefault(false)
-
-                if (deletedFromDisk) {
-                    if (repository.deleteById(entity.id) == 0) {
-                        allDeleted = false
-                    }
-                } else {
-                    allDeleted = false
-                }
-            }
-        allDeleted
+            .forEach { entity -> repository.deleteById(entity.id) }
+        true
     }
 
     private fun createTargetFile(folder: String, displayName: String, mimeType: String?): File {

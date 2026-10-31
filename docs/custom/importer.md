@@ -192,7 +192,7 @@ adb shell am instrument -w \
 导入器本体。它与第一次改 schema 同一批做，顺序是导入器先落地并验证，再动结构：
 
 1. 读取层：先定 fixture 与期望值（行数、列集合、内容 hash，由独立脚本算出），再写 reader，用 androidTest 跑。
-2. 版本判定与分流：接到 `restoreFromBackupFile`。
+2. 版本判定与分流：接在 `BackupManager.stageRestore`，判定只读元数据。
 3. 写入：行数据 → 新建 Room 库 → 校验能打开且各表 hash 与期望值一致。
 4. settings 形状校验。附件替换天然复用（共用 `PendingRestore.buildEntries`）；归档要跟着分流走：现在的归档调用在 `stageRestore` 之后，导入器分支不走那条路，得把调用上移成两条分支共用，或在导入器分支里再调一次。
 5. 验收。
@@ -210,7 +210,7 @@ adb shell am instrument -w \
 - `upload/` 与 `fonts/` 在导出侧只收顶层文件，替换侧却是递归删除。payload 同时带数据库时，live 里这两个目录下的子目录文件会被删掉，因为它们不可能出现在任何 payload 里。这符合替换语义，但值得知道。
 - `media_creation/` 下的 `.part` 临时文件导出时被跳过，替换时会当成「备份里没有」而删除。它们是半成品，删掉通常无害，但下载中的任务会受影响。
 - 设备上跑 androidTest 时曾遇到测试进程解析不到新类，查下来是 `adb push` 没有覆盖设备上的旧文件，装的一直是旧 APK：推送前先删掉远端文件再装即可。记在这里是因为排查花了不少时间，不是代码问题。
-- 真正的官方备份样本还没拿到，读取层的正向测试暂时用应用自己创建的库当替身。
+- 读取层与写入层的单元测试仍用应用自己创建的库当替身；真实官方样本走 `OfficialSampleAcceptanceTest`，只在设备上有样本时执行。
 - live 文件名里带反斜杠会让整次导入失败。校验放在 `buildRemovalEntries` 里、journal 落地之前，所以失败会走 `failed-*` 分支：用户看到「已保留原数据」，下次启动不会重播。漏掉这层校验的话，`apply` 会反复抛异常，而 `RikkaHubApp` 只捕获 `RestoreFailedException`，结果是每次启动都崩。这种文件名不需要 root 就能产生：`FileUtils` 从 provider 的 displayName 取扩展名，`foo.\x` 会拼出带反斜杠的名字。
 - 归档目前在应用内取不回来，需要 root 或 adb。
 - 字段语义变化无法从 header 识别，只能靠流程。

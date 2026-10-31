@@ -87,7 +87,7 @@ fun Route.filesRoutes(
             val id = idParam.toLongOrNull()
                 ?: throw BadRequestException("Invalid file id")
 
-            val deleted = filesManager.delete(id, deleteFromDisk = true)
+            val deleted = filesManager.delete(id)
             if (!deleted) {
                 throw NotFoundException("File not found")
             }

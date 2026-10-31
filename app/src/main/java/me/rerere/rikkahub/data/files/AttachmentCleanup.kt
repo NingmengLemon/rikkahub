@@ -42,13 +42,26 @@ class AttachmentCleanup(
         var deleted = 0
         var freed = 0L
         var kept = 0
+        val cutoff = System.currentTimeMillis() - IN_FLIGHT_WINDOW_MILLIS
         for (candidate in candidates) {
-            val referenced = candidate in avatarPaths || database.messageNodeDao().hasFileReference(candidate)
+            // 判据是子串匹配，方向偏保守：文件名里带反斜杠之类会被 JSON 转义，裸路径可能匹配
+            // 不到，所以转义后的形状也试一次，任一处命中都算「还在用」。
+            val referenced = candidate in avatarPaths ||
+                database.messageNodeDao().hasFileReference(candidate) ||
+                (candidate.contains(
+                    '\\'
+                ) && database.messageNodeDao().hasFileReference(candidate.replace("\\", "\\\\")))
             if (referenced) {
                 kept++
                 continue
             }
             val file = File(context.filesDir, candidate)
+            // 刚写进来的文件可能被还没落库的草稿或消息队列引用，扫描看不见它们，先跳过。
+            // 这是有意的兜底：漏删只是少收一次垃圾，误删会直接弄丢用户刚贴的附件。
+            if (file.lastModified() > cutoff) {
+                kept++
+                continue
+            }
             val size = file.length()
             if (file.delete()) {
                 deleted++
@@ -56,5 +69,10 @@ class AttachmentCleanup(
             }
         }
         Report(deleted = deleted, freedBytes = freed, kept = kept)
+    }
+
+    private companion object {
+        /** 扫描时跳过刚写入的文件，避开草稿与消息队列这类还没进消息表的引用 */
+        const val IN_FLIGHT_WINDOW_MILLIS = 30 * 60 * 1000L
     }
 }
