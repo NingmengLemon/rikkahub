@@ -24,6 +24,8 @@ import me.rerere.rikkahub.data.db.SQLiteConfiguration
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.files.MediaCreationFiles
 import me.rerere.rikkahub.data.sync.official.OfficialDatabaseAdapter
+import me.rerere.rikkahub.data.sync.official.OfficialDatabaseConverter
+import me.rerere.rikkahub.data.sync.official.OfficialDatabaseSchema
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -166,6 +168,15 @@ class BackupManager(
                     require(restoredEntries > 0) { "No selected data found in the backup" }
                     require(!stagedWal.exists() || stagedDatabase.exists()) { "Backup WAL has no matching database" }
                     if (stagedDatabase.exists()) {
+                        // 版本高于本仓库时迁移链无能为力，先用导入器把它转成当前版本；
+                        // 低了或相同都交给迁移链，那是已经验证过的路径。
+                        val snapshot = OfficialDatabaseConverter.snapshotOf(stagedDatabase)
+                        if (snapshot != null && snapshot.version > OfficialDatabaseSchema.VERSION) {
+                            val converted = File(staging, "converted-${stagedDatabase.name}")
+                            OfficialDatabaseConverter(context).convert(stagedDatabase, converted)
+                            check(stagedDatabase.delete()) { "Cannot replace staged database" }
+                            Files.move(converted.toPath(), stagedDatabase.toPath())
+                        }
                         DatabaseBackup.normalize(context, stagedDatabase)
                         // Reject unsupported schemas before publishing; run supported old migrations on the copy.
                         val room = AppDatabaseFactory.create(context, stagedDatabase.absolutePath)
