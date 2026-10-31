@@ -27,16 +27,40 @@ import java.security.MessageDigest
  */
 @RunWith(AndroidJUnit4::class)
 class OfficialSampleAcceptanceTest {
-    private val sample = File("/data/local/tmp/rikkahub-sample-v32.db")
-    private val expectations = File("/data/local/tmp/backup-expectations-v32.json")
+    /** 一个样本：版本、设备上的库路径，以及独立算出来的期望值 */
+    private data class Case(val version: Int, val sample: File, val expectations: File) {
+        val present: Boolean get() = sample.isFile && expectations.isFile
+    }
+
+    private val cases = listOf(
+        Case(
+            version = 32,
+            sample = File("/data/local/tmp/rikkahub-sample-v32.db"),
+            expectations = File("/data/local/tmp/backup-expectations-v32.json"),
+        ),
+        Case(
+            version = 31,
+            sample = File("/data/local/tmp/rikkahub-sample-v31.db"),
+            expectations = File("/data/local/tmp/backup-expectations-v31.json"),
+        ),
+    )
 
     @Test fun everyTableMatchesTheIndependentlyComputedDigest() {
-        assumeTrue("没有放样本或期望值，跳过", sample.isFile && expectations.isFile)
+        val available = cases.filter { it.present }
+        assumeTrue("没有放样本或期望值，跳过", available.isNotEmpty())
+        available.forEach(::verify)
+    }
 
-        val expected = Json.parseToJsonElement(expectations.readText()).jsonObject
-        assertEquals("期望值的 schema 版本要与样本一致", 32, expected.getValue("schemaFileVersion").jsonPrimitive.int)
+    private fun verify(case: Case) {
+        val expected = Json.parseToJsonElement(case.expectations.readText()).jsonObject
+        assertEquals(
+            "v${case.version} 期望值的 schema 版本要与样本一致",
+            case.version,
+            expected.getValue("schemaFileVersion").jsonPrimitive.int,
+        )
 
-        OfficialDatabaseReader.open(sample).use { reader ->
+        OfficialDatabaseReader.open(case.sample).use { reader ->
+            assertEquals("读取层选中的快照版本", case.version, reader.snapshot.version)
             val tables = expected.getValue("tables").jsonObject
             for ((name, raw) in tables) {
                 val entry = raw.jsonObject
