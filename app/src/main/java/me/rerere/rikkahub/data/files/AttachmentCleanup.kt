@@ -1,6 +1,7 @@
 package me.rerere.rikkahub.data.files
 
 import android.content.Context
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -10,14 +11,15 @@ import me.rerere.rikkahub.data.model.Avatar
 import java.io.File
 
 /**
- * 附件清理：删掉没人引用的文件。
+ * 附件回收的扫描：哪些文件没人引用了。
  *
- * 标记-清除而不是引用计数：引用点分散在消息 JSON、助手头像、用户头像里，计数要在每一处删除
- * 路径上维护，漏一处就少算、少算就误删；这里只要求扫描覆盖面，漏一处最坏是少收一点垃圾。
+ * 目前只扫不删。原因是引用点没有全部收进库：草稿和消息队列只存在内存里，扫描看不见它们，
+ * 而内容寻址命中复用文件时不会刷新 mtime，所以「跳过最近写入的文件」这类时间启发式挡不住
+ * 「老文件 + 新的未发送引用」。把可回收名单报给用户是安全的，真删不是。
  *
- * 只手动触发，只在 `upload/` 目录里动。判据是「消息里有没有提过这个相对路径」，走
- * [me.rerere.rikkahub.data.db.dao.MessageNodeDAO.hasFileReference]：它按子串匹配，所以
- * 跨包名的绝对路径也能认出来，方向偏保守。
+ * 只扫 `upload/`。技能、字体、媒体创作各有自己的生命周期，不在范围内。
+ *
+ * 引用来源：消息 JSON、助手头像与背景、用户头像、收藏快照。
  */
 class AttachmentCleanup(
     private val context: Context,
@@ -25,9 +27,10 @@ class AttachmentCleanup(
     private val settingsStore: SettingsStore,
 ) {
 
-    data class Report(val deleted: Int, val freedBytes: Long, val kept: Int)
+    /** 扫一遍的结果。`reclaimableBytes` 是这些孤儿占的空间，现在不动它们。 */
+    data class Report(val orphaned: Int, val reclaimableBytes: Long, val kept: Int)
 
-    suspend fun collect(): Report = withContext(Dispatchers.IO) {
+    suspend fun scan(): Report = withContext(Dispatchers.IO) {
         val candidates = FilesCleanupPlanner.candidatesIn(context.filesDir, FileFolders.UPLOAD)
         if (candidates.isEmpty()) return@withContext Report(0, 0, 0)
 
@@ -40,47 +43,46 @@ class AttachmentCleanup(
             (settings.displaySetting.userAvatar as? Avatar.Image)?.url?.let(::add)
         }.mapNotNull { url -> url.substringAfter("/files/", "").takeIf { it.isNotEmpty() } }.toSet()
 
-        // 收藏存的是消息快照，图片引用也在里面；消息删掉、收藏还在时，文件不能当孤儿。
-        // 一次读完所有收藏的 JSON，避免每个候选都查一遍库。
+        // 收藏存的是消息快照，图片引用也在里面；消息删掉、收藏还在时不能算孤儿。
+        // 一次读完所有收藏的 JSON，避免每个候选查一遍库。
         val favoriteJson = database.favoriteDao().listAll().first().joinToString("\n") {
             it.refJson + "\n" + it.snapshotJson + "\n" + (it.metaJson ?: "")
         }
 
-        var deleted = 0
-        var freed = 0L
+        var orphaned = 0
+        var reclaimable = 0L
         var kept = 0
-        val cutoff = System.currentTimeMillis() - IN_FLIGHT_WINDOW_MILLIS
         for (candidate in candidates) {
-            // 判据是子串匹配，方向偏保守：文件名里带反斜杠之类会被 JSON 转义，裸路径可能匹配
-            // 不到，所以转义后的形状也试一次，任一处命中都算「还在用」。
-            val referenced = candidate in avatarPaths ||
-                candidate in favoriteJson ||
-                database.messageNodeDao().hasFileReference(candidate) ||
-                (candidate.contains(
-                    '\\'
-                ) && database.messageNodeDao().hasFileReference(candidate.replace("\\", "\\\\")))
-            if (referenced) {
+            if (isReferenced(candidate, avatarPaths, favoriteJson)) {
                 kept++
                 continue
             }
-            val file = File(context.filesDir, candidate)
-            // 刚写进来的文件可能被还没落库的草稿或消息队列引用，扫描看不见它们，先跳过。
-            // 这是有意的兜底：漏删只是少收一次垃圾，误删会直接弄丢用户刚贴的附件。
-            if (file.lastModified() > cutoff) {
-                kept++
-                continue
-            }
-            val size = file.length()
-            if (file.delete()) {
-                deleted++
-                freed += size
-            }
+            orphaned++
+            reclaimable += File(context.filesDir, candidate).length()
         }
-        Report(deleted = deleted, freedBytes = freed, kept = kept)
+        Report(orphaned = orphaned, reclaimableBytes = reclaimable, kept = kept)
     }
 
-    private companion object {
-        /** 扫描时跳过刚写入的文件，避开草稿与消息队列这类还没进消息表的引用 */
-        const val IN_FLIGHT_WINDOW_MILLIS = 30 * 60 * 1000L
+    /**
+     * 候选在库里是否还被提到。
+     *
+     * 消息里存的是 `Uri.fromFile(...)` 的结果，会做百分号编码；磁盘上的文件名不做编码，
+     * 所以除了裸路径还要按 URI 编码后的形状再找一次。文件名里的反斜杠在 JSON 里也是转义的。
+     *
+     * 判据是子串匹配，方向偏保守：命中就保留。漏判只会让名单少一项，而名单目前不执行。
+     */
+    private suspend fun isReferenced(
+        candidate: String,
+        avatarPaths: Set<String>,
+        favoriteJson: String,
+    ): Boolean {
+        if (candidate in avatarPaths) return true
+        if (candidate in favoriteJson) return true
+        val encoded = Uri.encode(candidate, "/")
+        if (encoded != candidate && encoded in favoriteJson) return true
+        val dao = database.messageNodeDao()
+        if (dao.hasFileReference(candidate)) return true
+        if (encoded != candidate && dao.hasFileReference(encoded)) return true
+        return candidate.contains('\\') && dao.hasFileReference(candidate.replace("\\", "\\\\"))
     }
 }

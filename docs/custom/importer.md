@@ -78,7 +78,7 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 这一节已经落地（C20）：`data/sync/official/OfficialDatabaseReader` 提供只读访问，打开时用 `PRAGMA table_info` 与 `user_version` 核对结构，结构与类型判断抽在 `OfficialSchemaVerifier` 里，不依赖 Android，可以直接跑 JVM 测试。
 
 - `SQLiteDatabase.openDatabase(..., OPEN_READONLY)` 打开。不跑 integrity_check，那是 `DatabaseBackup.normalize` 的职责；导入器在解压后先调一次 `normalize` 把 `-wal` 合进去，再读。
-- 不加载 Room、不引用本仓库的 `@Entity`，表名列名全部来自 `OfficialDatabaseSchema`。
+- 不加载 Room、不引用本仓库的 `@Entity`，表名列名按库里的 `user_version` 从 `OfficialSnapshots` 选版本快照。
 - 只读业务表，`message_fts*` 跳过。
 - 逐行迭代，不 materialize：每张表产出 `Sequence<OfficialRow>`。`OfficialRow` 携带表名与列值，列值按 affinity 在读取时转成确定的类型，行对象不依赖 cursor。读取时校验：快照里有、库里没有的列失败；类型与快照冲突失败；表缺失失败；库里多出来的列忽略并记日志。
 - 附件目录与嵌套规则引用 `OfficialBackupLayout`，不要在这里重列一遍。
@@ -183,7 +183,7 @@ adb shell am instrument -w \
     <包名>.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-当前状态：v31 与 v32 两份样本各 14 张表全部通过，两层都验：读取层直接读原始备份，转换层把样本经转换器写成当前版本库再读。 转换层只比对源版本也有的列，因为转换后是当前版本结构；另有一条断言确认转换结果里没有残留指向别的安装的附件路径。期望值对附件绝对路径做了前缀归一（换成 `file://<files>/`），否则「路径被正确重写」会被当成「内容不一致」。还没做的判据：附件文件的哈希集合、settings 的关键字段、搜索的人工闸门。v32 是 168 会话 / 673 节点 / 97 附件 / 476 用量；v31 是 1664 会话 / 11483 节点 / 8080 附件 / 8431 用量。v16（官方 2.1.6）明确不支持，不纳入样本集。测试按版本循环，哪份样本不在设备上就跳过哪一份。
+当前状态：v31 与 v32 两份样本各 14 张表全部通过，两层都验：读取层直接读原始备份，转换层把样本经转换器写成当前版本库再读。 转换层只比对源版本也有的列，因为转换后是当前版本结构；另有一条断言确认转换结果里没有残留指向别的安装的附件路径。期望值对附件绝对路径做了前缀归一（换成 `file://<files>/`），否则「路径被正确重写」会被当成「内容不一致」。还没做的判据：附件文件的哈希集合、settings 的关键字段、首次启动后 live 目录里没有归档之外的多余文件、搜索的人工闸门；样本类别里改 identity 的构造样本与本 fork 旧构建也还没有固定样本。v32 是 168 会话 / 673 节点 / 97 附件 / 476 用量；v31 是 1664 会话 / 11483 节点 / 8080 附件 / 8431 用量。v16（官方 2.1.6）明确不支持，不纳入样本集。测试按版本循环，哪份样本不在设备上就跳过哪一份。
 
 每次改动 schema 或 `Settings` 之后要重跑全部样本，这条与 roadmap 一致。
 

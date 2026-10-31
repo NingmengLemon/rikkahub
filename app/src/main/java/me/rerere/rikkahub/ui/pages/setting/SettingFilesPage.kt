@@ -71,8 +71,8 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Clean
-import me.rerere.hugeicons.stroke.Delete02
 import me.rerere.hugeicons.stroke.Delete01
+import me.rerere.hugeicons.stroke.Delete02
 import me.rerere.hugeicons.stroke.File01
 import me.rerere.hugeicons.stroke.FileAudio
 import me.rerere.hugeicons.stroke.FileVideo
@@ -180,11 +180,13 @@ fun SettingFilesPage(
     if (showOrphanDialog) {
         AlertDialog(
             onDismissRequest = { if (!cleaningOrphans) showOrphanDialog = false },
-            title = { Text("清理未引用的附件") },
+            title = { Text("扫描可回收的附件") },
             text = {
                 Text(
-                    "附件按内容只存一份，删除对话不会立刻释放空间。这里会扫一遍全部消息和头像，" +
-                        "把没人引用的文件删掉。扫描要读所有消息，可能需要一会儿。"
+                    "附件按内容只存一份，删除对话不会立刻释放空间。这里会扫一遍全部消息、头像与收藏，" +
+                        "算出没人引用的文件占了多少。\n\n" +
+                        "目前只统计、不删除：草稿和待发送队列里的附件还没写进数据库，扫描看不到它们，" +
+                        "现在删有删掉在用附件的风险。"
                 )
             },
             confirmButton = {
@@ -193,17 +195,19 @@ fun SettingFilesPage(
                     onClick = {
                         cleaningOrphans = true
                         scope.launch {
-                            runCatching { attachmentCleanup.collect() }
+                            runCatching { attachmentCleanup.scan() }
                                 .onSuccess {
-                                    toaster.show("已删除 ${it.deleted} 个，释放 ${it.freedBytes.fileSizeToString()}")
+                                    toaster.show(
+                                        "可回收 ${it.orphaned} 个，共 ${it.reclaimableBytes.fileSizeToString()}"
+                                    )
                                     showOrphanDialog = false
                                 }
-                                .onFailure { toaster.show("清理失败：${it.message}") }
+                                .onFailure { toaster.show("扫描失败：${it.message}") }
                             cleaningOrphans = false
                         }
                     }
                 ) {
-                    Text(if (cleaningOrphans) "正在清理..." else "开始清理")
+                    Text(if (cleaningOrphans) "正在扫描..." else "开始扫描")
                 }
             },
             dismissButton = {
@@ -228,7 +232,7 @@ fun SettingFilesPage(
                     ) {
                         Icon(
                             imageVector = HugeIcons.Delete02,
-                            contentDescription = "清理未引用的附件",
+                            contentDescription = "扫描可回收的附件",
                         )
                     }
                     IconButton(

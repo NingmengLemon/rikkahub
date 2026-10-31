@@ -2,6 +2,7 @@ package me.rerere.rikkahub.data.sync.official
 
 import android.content.Context
 import androidx.core.net.toUri
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.db.AppDatabaseFactory
@@ -50,7 +51,7 @@ internal class OfficialDatabaseConverter(
      * 分叉之后我们这边删表或改表名也会走到这里；两种情况都该明确失败，而不是写一半再崩。
      */
     private fun requireTargetCoversSnapshot(
-        database: androidx.sqlite.db.SupportSQLiteDatabase,
+        database: SupportSQLiteDatabase,
         tables: Map<String, OfficialSchemaTypes.Table>,
     ) {
         for ((name, table) in tables) {

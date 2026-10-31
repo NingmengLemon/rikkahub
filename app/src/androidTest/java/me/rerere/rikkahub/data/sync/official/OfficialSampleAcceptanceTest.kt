@@ -1,7 +1,7 @@
 package me.rerere.rikkahub.data.sync.official
 
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.core.net.toUri
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
