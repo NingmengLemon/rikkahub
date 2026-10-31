@@ -120,7 +120,7 @@ class OfficialDatabaseReaderTest {
      * 读一份真实的官方 v32 备份里的库。
      *
      * 样本不在仓库里，也不进 APK：测试从设备上的固定路径读，没有就跳过（CI 上不会因此失败）。
-     * 路径用 `adb push` 放进去，见 `docs/custom/importer.md` 的验收一节。
+     * 路径用 `adb push` 放进去，见 `docs/custom/backup/acceptance.md`。
      */
     @Test fun readsTheProvidedOfficialSample() {
         val sample = File("/data/local/tmp/rikkahub-sample-v32.db")

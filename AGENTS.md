@@ -44,7 +44,7 @@ App 有一个 `distribution` 维度的 product flavor：`github`（默认）和 
 - **search**: Search functionality SDK for multiple providers (Exa, Tavily, Zhipu, Bing, Brave, SearXNG, and others)
 - **speech**: Only the serialized `TTSProviderSetting` and `ASRProviderSetting` data classes remain (kept so persisted
   settings still decode). The TTS and ASR runtime implementations were removed on this branch, see C5 in
-  `docs/custom/README.md`.
+  `docs/custom/checklist.md`.
 - **web**: Embedded web server module that provides Ktor server startup function and hosts static frontend build files (
   built from web-ui/ React project)
 - **workspace**: Sandboxed per-workspace file system and shell execution environment exposed to the AI as tools.
@@ -115,15 +115,16 @@ This repository carries personal customizations on top of upstream `rikkahub/rik
 
 - Work on `custom`. `master` only follows upstream and must stay fast-forwardable; never commit to it.
 - Read `docs/custom/README.md` before adding or removing a feature. It holds the branch model, the upstream sync
-  procedure, the constraints, and the per-customization checklist. `docs/custom/roadmap.md` holds the long-term plan:
-  the stage split, the easy-migration target, the upstream follow-up strategy, and distribution/compliance notes.
-- Tag customization commits with the `custom` scope, e.g. `feat(custom): ...`, and append the change to the checklist
-  table in `docs/custom/README.md` so a later upstream merge can be checked against it.
+  procedure, and the customization principles. `docs/custom/checklist.md` is the per-customization register,
+  `docs/custom/roadmap.md` the long-term plan (stage split, easy-migration target, upstream follow-up strategy,
+  distribution/compliance), and `docs/custom/backup/` the backup import/export chain with its acceptance procedure.
+- Tag customization commits with the `custom` scope, e.g. `feat(custom): ...`, and add the item to
+  `docs/custom/checklist.md` (an index row plus a detail section) so a later upstream merge can be checked against it.
 - The persisted-data freeze is lifted: the official-backup importer exists and passes validation on the fixed sample
   set, so Room schema changes and `Settings` structure changes are allowed. What still holds is backwards
   compatibility with our own past builds: a Room change ships with its migration, new serialized fields carry a
   default, existing field meanings do not change, and the acceptance samples are re-run afterwards. The
-  data-structure section of `docs/custom/README.md` lists the constraints; `docs/custom/importer.md` holds the
+  data-structure section of `docs/custom/README.md` lists the constraints; `docs/custom/backup/acceptance.md` holds the
   acceptance procedure.
 - A Room schema change also makes the official-compatible export fail until its trimming logic exists (see C18). That
   failure is deliberate, not a bug.

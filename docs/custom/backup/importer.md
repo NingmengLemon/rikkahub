@@ -1,0 +1,65 @@
+# 导入器
+
+结构分叉之后的转换路径：官方库（或本 fork 其它包名构建产出的库）与当前 Room 结构对不上时，读出来再写进一份新建的当前版本库。分流判据与整体流程见 [`README.md`](README.md)。
+
+## 现状
+
+导入器已落地（C20 到 C23）：读取层、版本分流、转换与附件路径重写都在，验收覆盖读取层与转换产物两层（C24、C26）。
+
+分叉尚未发生：官方 v32 的 schema identity 与本仓库相同（`c64deeb13766eaf6528a2f4f6965c836`），真实的官方 v32 备份进来时，分流会判定它「就是本仓库的库」，直接走 `stageRestore`，导入器不被触发。导入器要到我们改动 Room 结构之后才用得上，这也决定了它的正向路径只能用构造样本验证。
+
+## 要解决的问题
+
+迁移链只能把结构上可迁移的库升上来。两种情况它处理不了：
+
+- 官方库版本高于我们：没有 downgrade 路径。
+- 官方库的 identity 与我们不同：Room 拒绝打开。
+
+第三种（两边一致，但我们改了某个字段的含义）任何基于 header 的判定都识别不出，见 [`README.md`](README.md) 的分流一节。
+
+## 读取层
+
+`data/sync/official/OfficialDatabaseReader` 提供只读访问，打开时用 `PRAGMA table_info` 与 `user_version` 核对结构，结构与类型的判断抽在 `OfficialSchemaVerifier` 里，不依赖 Android，可以直接跑 JVM 测试。
+
+- `SQLiteDatabase.openDatabase(..., OPEN_READONLY)` 打开。不跑 integrity_check，那是 `DatabaseBackup.normalize` 的职责；导入器在解压后先调一次 `normalize` 把 `-wal` 合进去，再读。
+- 不加载 Room、不引用本仓库的 `@Entity`，表名列名按库里的 `user_version` 从 `OfficialSnapshots` 选版本快照。
+- 只读业务表，`message_fts*` 跳过。
+- 逐行迭代，不 materialize：每张表产出 `Sequence<OfficialRow>`。`OfficialRow` 携带表名与列值，列值按 affinity 在读取时转成确定的类型，行对象不依赖 cursor。读取时校验：快照里有、库里没有的列失败；类型与快照冲突失败；表缺失失败；库里多出来的列忽略并记日志。
+- 附件目录与嵌套规则引用 `OfficialBackupLayout`，不要在这里重列一遍。
+- 读取层里碰 SQLite 的部分只能在 androidTest 里验证，工程没有 JVM SQLite 或 Robolectric；结构与类型的判断已经抽成纯函数，那部分跑 JVM 测试。
+
+## 写入
+
+写入目标是新建的空库，不是正在用的库：没有清空这一步，也没有与运行中会话抢写的问题。
+
+- 一个事务包住全部写入，失败即整个临时库作废。
+- 表顺序按外键：先父表后子表，顺序由 `OfficialTableOrder` 从快照的外键推出，循环外键直接报错。
+- `message_node` 的 `node_index`、`select_index` 与 id 原样保留。`ConversationEntity.nodes` 是遗留空列（v12 起恒为 `"[]"`，树在 `message_node` 里），照抄即可。
+- 自增表（`GenMediaEntity`、`managed_files`、`usage_record`）显式写 id；SQLite 会自己把 `sqlite_sequence` 提到显式 id 之上。
+- JSON 字段（`UIMessage`、`config`、`toolApprovals` 等）原样搬运，不解析再序列化。解析会丢未知字段，也会把官方的格式变化变成我们这边的转换错误。
+- 快照里有、我们当前的 `@Entity` 没有的列：拒绝导入这一版，不按默认值硬填。转换器在动手写之前就做这项对账，缺列时给出明确信息而不是让插入失败。
+- 逐列照抄，目前没有字段映射表：两边没有分叉，所有列的处理方式都是「直接照抄」。真正需要区分「照抄还是转换」是在我们改字段结构之后，届时要为每个官方版本维护一张逐列的映射表，并配一条完整性测试，保证表里覆盖了该版本快照的每一列。
+
+## 附件路径重写
+
+附件引用是绝对 `file://` URI，包名在路径里。写入文本列前要把 `file:///data/(user|data)/<任意>/<任意包名>/files/` 前缀换成当前应用的 files 目录，否则导入到改过包名的应用后附件全部失配。官方备份里的消息引用普遍是这种绝对形式；助手头像与用户头像在 `settings.json` 里，方向相同但重写发生在 settings 分支。只认这一种形状，不绑定包名；JSON 整段做字符串替换，不解析。
+
+等附件引用改成相对形式之后，这一步对自家归档不再需要，但官方备份进来的方向仍然是绝对路径，重写要一直保留。
+
+## settings
+
+官方 `settings.json` 的处理与 `stageRestore` 一致：`SettingsJsonMigrator.migrate` → `JsonInstant.decodeFromString<Settings>`，然后按现有方式重新编码写回 pending。
+
+计划在解码之前加一层直接作用在原始 JSON 上的检查：把原文解析成 `JsonObject`，按官方 v32 的 key/type 形状校验（包含 `providers`、`assistants`、`displaySetting` 这些嵌套对象的形状），关键项缺失或类型不符时失败。这一层还没实现。
+
+这一层不是完整方案：它只校验形状，转换仍然复用现有的 `Settings` 反序列化。完整的独立解析器（冻结的 `OfficialSettingsV32` 加字段映射）与写入侧的字段映射是同一件事，在 `Settings` 开始与官方分叉时一起做。`Settings` 顶层约 50 个字段，加上嵌套对象的形状，成本可控。
+
+这层检查的钩子要放在共用的恢复入口上，否则官方 v32 走 `stageRestore` 时它不会跑。
+
+`launchCount` 不属于 `Settings`，由 `PendingRestore.apply` 在启动前与 settings 一起写入，不在运行时单独设。
+
+## 维护时机
+
+- 官方升 schema：用 `tools/gen-official-snapshot.ps1` 生成新快照，在 `OfficialSnapshots` 注册一行；读取层只认清单里的版本，不在清单里的版本明确失败。
+- 我们自己改 schema：补齐迁移链，确认转换器对账的表与列仍然覆盖，再重跑 [`acceptance.md`](acceptance.md) 的样本。
+- 我们改字段含义：同步更新写入侧的字段映射表，这是唯一能发现语义漂移的地方。

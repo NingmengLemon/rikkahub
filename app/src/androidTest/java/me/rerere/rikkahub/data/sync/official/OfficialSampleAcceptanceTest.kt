@@ -25,7 +25,7 @@ import java.security.MessageDigest
  * 的读取层，所以这里对不上就是读取层读错了，不是自证。
  *
  * 样本与期望值都放在仓库外（含私人数据），测试从设备上读，没有就跳过；CI 上不会因此失败。
- * 具体命令见 `docs/custom/importer.md` 的验收一节。
+ * 具体命令见 `docs/custom/backup/acceptance.md`。
  */
 @RunWith(AndroidJUnit4::class)
 class OfficialSampleAcceptanceTest {
