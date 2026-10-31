@@ -121,14 +121,16 @@ This repository carries personal customizations on top of upstream `rikkahub/rik
   `docs/custom/build.md` / `docs/custom/locale.md` the build and string-resource operations.
 - Tag customization commits with the `custom` scope, e.g. `feat(custom): ...`, and add the item to
   `docs/custom/checklist.md` (an index row plus a detail section) so a later upstream merge can be checked against it.
-- The persisted-data freeze is lifted: the official-backup importer exists and the inbound criteria pass on the real
-  samples (v32 and v31 tables and converted output, v32 attachments and settings). Two gaps remain and are recorded in
-  `docs/custom/backup/acceptance.md`: v31 attachments were not compared one by one, and the official-compatible export
-  is not implemented. Room schema changes and `Settings` structure changes are allowed. What still holds is backwards
-  compatibility with our own past builds: a Room change ships with its migration, new serialized fields carry a
-  default, existing field and DataStore key meanings do not change, and the acceptance samples are re-run afterwards.
-  Changing a meaning would first need a field-mapping table, which does not exist yet. The data-structure section of
-  `docs/custom/README.md` lists the constraints.
+- The persisted-data freeze is lifted: the official-backup importer exists, and the criteria verified on the real samples
+  are v32/v31 tables and converted output plus v32 attachments and settings. The freeze was about official backups
+  coming in, and that path works. The untested criteria are listed in `docs/custom/backup/acceptance.md`: the Room
+  migration-chain upgrade (this one affects our own older builds, not official backups), v31 attachments, the
+  official-compatible export, and a post-restore check that currently covers only `upload/`. Room schema changes and
+  `Settings` structure changes are allowed. What still holds is backwards compatibility with our own past builds: a
+  Room change ships with its migration, new serialized fields carry a default, existing field and DataStore key
+  meanings do not change, and the acceptance samples are re-run afterwards. Changing a meaning would first need a
+  field-mapping table, which does not exist yet. The data-structure section of `docs/custom/README.md` lists the
+  constraints.
 - A Room schema change also makes the official-compatible export fail until its trimming logic exists (see C18). That
   failure is deliberate, not a bug.
 - Prefer disabling an entry point over deleting an implementation, so upstream merges stay cheap. This is a

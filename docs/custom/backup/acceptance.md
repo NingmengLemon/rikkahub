@@ -7,7 +7,7 @@
 六类，至少各一份：
 
 1. 带附件引用的官方客户端备份。跨安装，会命中 C25 的探测而走转换器，验的是转换与附件路径重写。内容要覆盖多分支会话与重新生成、带附件与工具调用的消息、多 provider 与自定义 assistant、自定义主题与提示词。
-2. 构造样本：把官方备份的 identity 改掉，让它落进 `OfficialRestorePlanner` 的 Convert 分支。Convert 只在双方版本号相同、identity 不同时触发，所以在官方升到与本仓库相同的版本号之前，这是唯一能验证那条入口的办法。
+2. 构造样本：把官方备份的 identity 改掉，让它落进 `OfficialRestorePlanner` 的 Convert 分支。Convert 要求双方版本号相同、identity 不同且该版本有快照，所以在官方升到与本仓库相同的版本号之前，这是唯一能验证那条入口的办法。
 3. 本 fork 旧构建导出的备份（改包名前，包名还是 `me.rerere.rikkahub`，带附件引用）。同样跨安装、同样命中 C25 走转换器；与第 1 类的区别是版本更低、settings 更旧。
 4. 本应用自己导出、且与当前安装同一包名同一用户号的备份。不跨安装，走原路径：Room 打开、checkpoint，不经转换器。版本低于当前时才会走迁移链升级，这一类目前没有样本或用例。
 5. 版本高于我们的库，必须明确报错。
@@ -30,7 +30,7 @@
 
 ## 跑法
 
-期望值文件一次算全：表摘要、settings 与附件清单都写进同一个 json，缺了哪一段，对应的断言会直接跳过。
+期望值文件一次算全：表摘要、settings 与附件清单都写进同一个 json。缺了哪一段，对应的断言会直接失败而不是跳过，所以三个参数缺一不可。
 
 ```bash
 # 1. 从原始备份里取出库与 settings，连同整份 zip 一起算期望值
@@ -61,7 +61,7 @@ adb shell am instrument -w \
     <包名>.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-v31 的样本推成 `rikkahub-sample-v31.db` 与 `backup-expectations-v31.json`，它只参与第一个测试类。
+v31 的样本推成 `rikkahub-sample-v31.db` 与 `backup-expectations-v31.json`，它只参与第一个测试类。它的期望值要用 `--schema app/schemas/me.rerere.rikkahub.data.db.AppDatabase/31.json` 生成，测试会拿这个值断言期望值与样本的版本一致。
 
 ## 覆盖范围
 
@@ -69,7 +69,7 @@ v31 的样本推成 `rikkahub-sample-v31.db` 与 `backup-expectations-v31.json`�
 | --- | --- | --- |
 | 官方客户端导出 | v32（官方 3.1.1，带附件引用） | 表数据与转换产物全量；附件逐个比；settings 的条数、id 集合、当前助手与模型 |
 | 构造样本 | `BackupManagerTest` 里改 identity 的用例 | 覆盖接线，无独立样本 |
-| 本 fork 旧构建 | v31（产出自 3.1.0 (193)，包名还是 `me.rerere.rikkahub`） | 表数据与内容摘要；settings 只验了条数（经 migrate 与 decode 后不变）；附件未逐个比 |
+| 本 fork 旧构建 | v31（产出自 3.1.0 (193)，包名还是 `me.rerere.rikkahub`） | 表数据与内容摘要；settings 只手工核对过条数（经 migrate 与 decode 后不变），没有脚本或测试复现；附件未逐个比 |
 | 本应用自己导出 | `BackupManagerTest` 的常规恢复用例 | 覆盖原路径（不经转换器）；迁移链升级无样本或用例 |
 | 高版本库 | `BackupManagerTest` 的拒绝用例 | 验过 |
 | 官方兼容出口 | 无 | 未做，裁剪逻辑还没实现 |
