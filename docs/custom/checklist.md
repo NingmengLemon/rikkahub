@@ -24,17 +24,17 @@
 | C14 | 移除设置页的分享本应用入口，统一品牌文案 | 移除 |
 | C15 | 移除更新检查 | 移除 |
 | C16 | 清除导出内容里的站点水印 | 移除 |
-| C17 | 冻结官方备份的结构快照 | 数据层 |
+| C17 | 冻结官方备份的结构快照 | 新增 |
 | C18 | 新增官方兼容的导出出口 | 新增 |
-| C19 | 附件按替换语义导入，导入的原始备份留底 | 数据层 |
-| C20 | 导入器读取层 | 数据层 |
-| C21 | 导入器写入层 | 数据层 |
-| C22 | 导入器支持多版本官方快照 | 数据层 |
-| C23 | 导入器接上恢复流程 | 数据层 |
-| C24 | 导入器验收：与独立算出的期望值逐表比对 | 数据层 |
-| C25 | 同版本备份也重写附件路径 | 数据层 |
-| C26 | 整份备份的附件验收 | 数据层 |
-| C27 | 全文索引自检与重建完整性标记 | 数据层 |
+| C19 | 附件按替换语义导入，导入的原始备份留底 | 改造 |
+| C20 | 导入器读取层 | 新增 |
+| C21 | 导入器写入层 | 新增 |
+| C22 | 导入器支持多版本官方快照 | 新增 |
+| C23 | 导入器接上恢复流程 | 新增 |
+| C24 | 导入器验收：与独立算出的期望值逐表比对 | 新增 |
+| C25 | 同版本备份也重写附件路径 | 改造 |
+| C26 | 整份备份的附件验收 | 新增 |
+| C27 | 全文索引自检与重建完整性标记 | 改造 |
 
 ## 明细
 
@@ -60,7 +60,7 @@
 
 - 落点：`utils/AIIconMatcher.kt`（删掉 aihubmix 的图标映射与匹配正则）、`app/src/main/assets/icons/aihubmix-color.svg`（删除）、`README.md`、`README_ZH_CN.md`、`README_ZH_TW.md`（删掉 Sponsors 章节）、`SettingPage.kt`（删掉启动 100 次后的赞助弹窗及其失效的三个 import 与 `launchCount` 订阅）、`SettingVM.kt`（删掉失去唯一读者的 `launchCount`）、弹窗的 4 条 `setting_page_sponsor_alert_*` 字符串 × 7 个 locale
 - 理由：不需要推广入口
-- 合并注意：捐赠页 `SettingDonatePage`、`SponsorAPI`、`Screen.SettingDonate` 与捐赠相关字符串保留不动。`Settings.sponsorAlertDismissedAt` 是已存储字段，未删除以免改动结构，只是不再有自动写入方，`DebugPage` 仍可手动改。刻意删除：`docs/sponsors/*.png` 与 `docs/donate.png` 已无引用，一并删掉；合并时上游若更新这些图片会成 modify/delete 冲突，按删除为准。三份 README 属上游高频改动文档，以上游最新版为准并重新删掉 Sponsors 章节；`SettingPage` 的弹窗区域与 `SettingProviderPage` 类似，上游若加回推广块，需要重新删除。`AIIconMatcher` 的图标映射本身不是推广入口，只删掉当年带推广性质的 aihubmix 那一条；上游后续新增的赞助商图标映射（3.1.1 的 `naapi`）保留
+- 合并注意：捐赠页 `SettingDonatePage`、`SponsorAPI`、`Screen.SettingDonate` 与捐赠相关字符串保留不动。`Settings.sponsorAlertDismissedAt` 是已存储字段，未删除以免改动结构，只是不再有自动写入方，`DebugPage` 仍可手动改。刻意删除：`docs/sponsors/*.png` 与 `docs/donate.png` 已无引用，一并删掉；合并时上游若更新这些图片会成 modify/delete 冲突，按删除为准。三份 README 属上游高频改动文档，以上游最新版为准并重新删掉 Sponsors 章节；`SettingPage` 的弹窗区域与 `SettingProviderPage` 类似，上游若加回推广块，需要重新删除。`AIIconMatcher` 的图标映射本身不是推广入口，只删掉带推广性质的 aihubmix 那一条；上游后续新增的赞助商图标映射（3.1.1 的 `naapi`）保留
 
 ### C5 移除 TTS 与 STT（语音合成与语音识别）
 
@@ -89,7 +89,7 @@
 
 - 落点：`data/sync/importer/` 整个包删除（主源集 `ChatboxImporter.kt`、`CherryStudioProviderImporter.kt`，测试源集 `app/src/test/java/me/rerere/rikkahub/data/sync/importer/ChatboxImporterTest.kt`）；`BackupVM`（`restoreFromChatBox`、`restoreFromCherryStudio`、`ChatboxRestoreResult` 及随之失去读者的 `conversationRepository`、`filesManager` 两个构造参数）；`ImportExportTab`（备份页「从其他 APP 导入」分组的两个入口）；7 个 locale 的 `backup_page_import_chatbox_desc`、`backup_page_import_cherry_studio_desc`、`backup_page_import_from_chatbox`、`backup_page_import_from_cherry_studio`、`backup_page_import_from_other_app` 已删除
 - 理由：不用这两个第三方客户端，也不需要它们的迁移路径
-- 合并注意：这里删的是实现而不是断入口，理由见上面「改动尽量小，优先断入口」一节的补充说明。上游若重新加回这两个入口，需要重新删除
+- 合并注意：这里删的是实现而不是断入口，理由见 [`README.md`](README.md) 的「改动尽量小，优先断入口」一节的补充说明。上游若重新加回这两个入口，需要重新删除
 
 ### C9 移除 S3 备份
 
@@ -111,7 +111,7 @@
 
 ### C12 改包名与应用名
 
-- 落点：`app/build.gradle.kts`（`applicationId` 改为 `top.lemoneko.rakkihub`）、`AndroidManifest.xml`（shortcut deep link 的 scheme 从 `rikkahub` 改为 `rakkihub`）、`res/xml/shortcuts.xml`（`android:data` 同步）、7 个 locale 的 `app_name` 改为 `RakkiHub`（德语在 3.1.1 之后补上，见「文案与 locale」一节）、`ExampleInstrumentedTest`（不再写死旧包名，改与 `BuildConfig.APPLICATION_ID` 比对）
+- 落点：`app/build.gradle.kts`（`applicationId` 改为 `top.lemoneko.rakkihub`）、`AndroidManifest.xml`（shortcut deep link 的 scheme 从 `rikkahub` 改为 `rakkihub`）、`res/xml/shortcuts.xml`（`android:data` 同步）、7 个 locale 的 `app_name` 改为 `RakkiHub`（德语是上游 3.1.1 才加的，见 [`locale.md`](locale.md)）、`ExampleInstrumentedTest`（不再写死旧包名，改与 `BuildConfig.APPLICATION_ID` 比对）
 - 理由：自主 fork 阶段要与官方应用并存，安装标识与私有数据目录必须独立
 - 合并注意：`namespace` 保持 `me.rerere.rikkahub` 不动，类名、R 类与 `shortcuts.xml` 的 `targetClass` 都不受影响；`applicationIdSuffix = ".debug"` 保留，debug 包名是 `top.lemoneko.rakkihub.debug`；`${applicationId}` 拼的 authorities 与 `BuildConfig.APPLICATION_ID` 自动跟随
 
@@ -131,7 +131,7 @@
 
 - 落点：`utils/UpdateChecker.kt` 与 `ui/components/ui/UpdateCard.kt` 整个删除，随前者一起消失的还有只服务于版本比较的 `Version` 类与 `app/src/test/java/me/rerere/rikkahub/utils/VersionTest.kt`（89 行、11 个用例）；`AppModule` 的 `UpdateChecker` 绑定与 import、`ViewModelModule` 的 `updateChecker` 实参、`ChatVM` 的构造参数与 `updateState` 流、`ChatDrawer` 的更新卡片与暂停计时逻辑、`SettingPreferencesNotificationPage` 的更新提醒设置项与暂停对话框；8 个 locale 各删 13 条文案（5 个 `update_card_*`、6 个 `setting_update_reminder_*`、2 个 `setting_display_page_show_updates_*`），`setting_page_preferences_notification_desc` 去掉「更新提醒」那一段
 - 理由：更新源指向官方，下载下来是官方包，装上去只是多出第二个应用；要新版本自己去看
-- 合并注意：保留 `Settings.displaySetting.updateCheckDisabledUntilEpochMillis` 这类已存储字段，DataStore key 不动，只是不再有读写方。`distribution` flavor 与 `BuildConfig.IS_PLAY_STORE` 保留：那是上游的构建结构，删掉会抬高每次合并的成本，现在没有代码读这个字段。这里和 C8 一样删的是实现而不是断入口，理由见「改动尽量小，优先断入口」一节的补充说明。上游若重构 `UpdateChecker` 或恢复正常更新流程，需要重新删除
+- 合并注意：保留 `Settings.displaySetting.updateCheckDisabledUntilEpochMillis` 这类已存储字段，DataStore key 不动，只是不再有读写方。`distribution` flavor 与 `BuildConfig.IS_PLAY_STORE` 保留：那是上游的构建结构，删掉会抬高每次合并的成本，现在没有代码读这个字段。这里和 C8 一样删的是实现而不是断入口，理由见 [`README.md`](README.md) 的「改动尽量小，优先断入口」一节的补充说明。上游若重构 `UpdateChecker` 或恢复正常更新流程，需要重新删除
 
 ### C16 清除导出内容里的站点水印
 
@@ -172,8 +172,8 @@
 ### C22 导入器支持多版本官方快照
 
 - 落点：新增 `OfficialSnapshots`（版本到快照的注册表）、`OfficialSchemaTypes`（表/列/索引/外键的类型，抽出来避免快照与注册表循环初始化）、`OfficialSnapshotV31` 与 `OfficialSnapshotV32`（从各自的 schema json 生成）；`OfficialDatabaseSchema` 收缩成「当前版本 + v32 的别名」；读取层按库里的 `user_version` 选快照，不在清单里的版本明确失败；`OfficialSchemaVerifier` 改成接受选中的表定义
-- 理由：读取层要能读官方 3.1.0（v31）的备份，单版本快照做不到；验收也要用同一套读取逻辑比对两份样本。恢复路径上 v31 备份走 Room 迁移链（版本比我们低），快照服务的是读取层、验收与之后的字段映射层
-- 合并注意：v31 的 identity 是 `a428043e...`，与官方 3.1.0 的库逐表对比 14 张表的列零差异。v16（官方 2.1.6）明确不支持：它和 v31 之间隔了十几个版本。两个快照文件由 `tools/gen-official-snapshot.ps1` 生成，官方升版时重新生成并在注册表加一行
+- 理由：读取层要能读 3.1.0 那版（v31）的备份，单版本快照做不到；验收也要用同一套读取逻辑比对两份样本。恢复路径上 v31 备份走 Room 迁移链（版本比我们低），快照服务的是读取层、验收与之后的字段映射层
+- 合并注意：v31 的 identity 是 `a428043e...`，与官方 3.1.0 的库逐表对比 14 张表的列零差异。这份样本产自 3.1.0 (193) 的构建，当时包名还是 `me.rerere.rikkahub`、schema 与官方一致，所以它同时代表官方 3.1.0 与本 fork 改包名前的旧构建。v16（官方 2.1.6）明确不支持：它和 v31 之间隔了十几个版本。两个快照文件由 `tools/gen-official-snapshot.ps1` 生成，官方升版时重新生成并在注册表加一行
 
 ### C23 导入器接上恢复流程
 
@@ -197,10 +197,10 @@
 
 - 落点：`tools/backup-expectations.py` 增加 `--settings` 与 `--zip`：只统计 settings 的助手与服务商条数，并从归档里算每个附件的路径、大小、SHA-256；新增 `OfficialBackupRestoreAcceptanceTest`（androidTest）：把真实归档走一遍 `stageRestore`，逐个断言附件的存在性与内容摘要，并确认解压出来的附件不多不少；另加 `RestoreAppliedOutcomeTest`：恢复应用之后 live 的 `upload/` 必须正好是归档那一份，上一次安装残留的文件要被清掉；settings 断言补上助手与服务商的 id 集合、当前助手、当前模型
 - 理由：表数据在库里能验，附件与 settings 不行：附件是文件、settings 不在任何表里。没有这一层，导入把附件丢了或换了内容都没人发现
-- 合并注意：样本是完整备份（含私人数据），放仓库外、设备上，缺了就跳过。settings 的期望值必须从**同一份归档**里取。跨归档借 `settings.json` 会把期望值算成另一份样本的数，表现为导入像丢了数据
+- 合并注意：样本是完整备份（含私人数据），放仓库外、设备上，缺了就跳过。settings 的期望值必须从**同一份归档**里取。跨归档借 `settings.json` 会把期望值算成另一份样本的数，表现为导入像丢了数据，实际是期望值来源错了，与导入链路无关
 
 ### C27 全文索引自检与重建完整性标记
 
-- 落点：`MessageFtsManager`（`isEmpty` 判断索引里有没有内容；`message_fts_state` 表记 `rebuild_complete`，重建开始置 0、成功收尾置 1）、`SearchIndexHealth.needsRebuild`（纯函数：有会话且（索引空或上次重建没跑完），六条 JVM 测试）、`ConversationRepository.needsSearchIndexRebuild`；`RikkaHubApp` 在恢复成功那次与常规启动都跑自检
+- 落点：`MessageFtsManager`（`isEmpty` 判断索引里有没有内容；`message_fts_state` 表记 `rebuild_complete`，重建开始置 0、成功收尾置 1）、`SearchIndexHealth.needsRebuild`（纯函数，新增 `rebuildComplete` 参数：有会话且（索引空或上次重建没跑完），六条 JVM 测试）、`ConversationRepository.needsSearchIndexRebuild`；`RikkaHubApp` 在恢复成功那次与常规启动都跑自检
 - 理由：重建是「先清空再逐会话写」，只靠「索引非空」发现不了残缺：重建中途被杀时索引非空但缺内容，自检会跳过，搜索永久缺一部分，用户也不知道该重建。恢复被中断同样会留下残缺索引
-- 合并注意：标记表与 `message_fts*` 同属 `onOpen` 里手写 SQL 建的表，不进 Room schema、不影响 identity 校验；恢复换库后若缺该行会触发一次重建，符合预期。判据仍有一处理论缺口：如果重建没跑过、但索引里恰好有内容，会多重建一次
+- 合并注意：标记表与 `message_fts*` 同属 `onOpen` 里手写 SQL 建的表，不进 Room schema、不动 DataStore 键、不影响 identity 校验；恢复换库后若缺该行会触发一次重建，符合预期。判据仍有一处理论缺口：如果重建没跑过、但索引里恰好有内容，会多重建一次

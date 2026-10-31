@@ -37,8 +37,6 @@ $env:JAVA_HOME='E:\WorkBench\Java\jdk-23.0.2'; $env:PATH="$env:JAVA_HOME\bin;$en
 
 workspace 模块另有 `workspace.ExampleUnitTest`（4/10，硬编码执行 `/bin/sh`，Windows 上 `CreateProcess error=2`）与 `workspace.RootfsInstallerTest`（1/3，软链断言期望 `/bin/busybox`）失败。
 
-上游 3.1.1 起 `highlight` 模块已并入 BetterText，原先那里由 CRLF 引发的 `LanguageFixtureTest` 整批失败不再存在。
-
 ## 格式检查
 
 `spotlessApply` 与 `spotlessCheck` 用 ktlint，`ratchetFrom("origin/master")` 写死，只检查相对该引用改动过的文件。因此 `origin/master` 必须存在且跟随上游，不要清理这个引用：本地 `master` 快进后若尚未推送，`origin/master` 仍停在旧基点，`spotlessCheck` 会把上游那一整批文件当作改动过的来检查，报出与本地定制无关的格式违规。
@@ -47,6 +45,6 @@ workspace 模块另有 `workspace.ExampleUnitTest`（4/10，硬编码执行 `/bi
 
 ## 设备上的 androidTest
 
-- 推测试包之前先删掉设备上的同名文件再 `adb push`。曾遇到 `adb push` 没有覆盖旧文件，装的一直是旧 APK，表现为测试进程解析不到新类
+- 推测试包之前先删掉设备上的同名文件再 `adb push`。同名文件已存在时，推上去的可能仍是旧字节，装上的旧包表现为测试进程解析不到新类
 - 系统的安装限制会拦下 Gradle 的安装步骤（`INSTALL_FAILED_USER_RESTRICTED`）。改为把包装到 `/data/local/tmp`，再 `su -c "pm install -r -d --user 0 <包路径>"` 安装
 - 验收样本含私人数据，放在设备上而不是仓库里，哪份不在就跳过哪份，见 [`backup/acceptance.md`](backup/acceptance.md)

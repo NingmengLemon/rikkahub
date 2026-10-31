@@ -17,6 +17,20 @@
 
 第三种（两边一致，但我们改了某个字段的含义）任何基于 header 的判定都识别不出，见 [`README.md`](README.md) 的分流一节。
 
+## 接入方式
+
+分叉之后，导入器不改正在用的库，而是造一份结构等同于当前版本的库，再走现有安装流程：
+
+1. 解压到 `PendingRestore.createStagingDirectory()` 的 `preparing-*` 目录，保留 `rikka_hub-wal` 这类旧格式条目。
+2. `OfficialDatabaseReader` 把官方库读成行数据。
+3. 在 staging 的 `payload/database/` 下新建空的 Room 库，把行数据写进去。
+   - 文件名必须是 `rikka_hub`：`PendingRestore.buildEntries` 按 `database/<name>` 识别，`targetFile` 也只接受这个名字，其他名字会在 apply 时直接报错。
+   - 写完后按现有顺序收尾：`try { checkpoint } finally { close }`，再 `removeSidecars`。留着非空的 `-wal` 会让 `buildEntries` 对同一路径生成两条 entry。
+4. settings 按原流程迁移、解码、重新编码，`launchCount` 一并带进 pending 的 `settings.json`。
+5. `PendingRestore.publish(staging)`，重启时原子替换。
+
+payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/files/<附件路径>`，`settings.json` 放在 staging 根。payload 为空时 `apply` 会写一份空 journal 然后返回 true，也就是「静默成功、什么都没装」，所以导入器必须确认至少写入了数据库或附件。
+
 ## 读取层
 
 `data/sync/official/OfficialDatabaseReader` 提供只读访问，打开时用 `PRAGMA table_info` 与 `user_version` 核对结构，结构与类型的判断抽在 `OfficialSchemaVerifier` 里，不依赖 Android，可以直接跑 JVM 测试。
@@ -38,7 +52,7 @@
 - 自增表（`GenMediaEntity`、`managed_files`、`usage_record`）显式写 id；SQLite 会自己把 `sqlite_sequence` 提到显式 id 之上。
 - JSON 字段（`UIMessage`、`config`、`toolApprovals` 等）原样搬运，不解析再序列化。解析会丢未知字段，也会把官方的格式变化变成我们这边的转换错误。
 - 快照里有、我们当前的 `@Entity` 没有的列：拒绝导入这一版，不按默认值硬填。转换器在动手写之前就做这项对账，缺列时给出明确信息而不是让插入失败。
-- 逐列照抄，目前没有字段映射表：两边没有分叉，所有列的处理方式都是「直接照抄」。真正需要区分「照抄还是转换」是在我们改字段结构之后，届时要为每个官方版本维护一张逐列的映射表，并配一条完整性测试，保证表里覆盖了该版本快照的每一列。
+- 除文本列的附件路径重写（见下节）之外，其余列逐列照抄，目前没有字段映射表：两边没有分叉，所有列的处理方式都是「直接照抄」。真正需要区分「照抄还是转换」是在我们改字段结构之后，届时要为每个官方版本维护一张逐列的映射表，并配一条完整性测试，保证表里覆盖了该版本快照的每一列。
 
 ## 附件路径重写
 
@@ -62,4 +76,4 @@
 
 - 官方升 schema：用 `tools/gen-official-snapshot.ps1` 生成新快照，在 `OfficialSnapshots` 注册一行；读取层只认清单里的版本，不在清单里的版本明确失败。
 - 我们自己改 schema：补齐迁移链，确认转换器对账的表与列仍然覆盖，再重跑 [`acceptance.md`](acceptance.md) 的样本。
-- 我们改字段含义：同步更新写入侧的字段映射表，这是唯一能发现语义漂移的地方。
+- 我们改字段含义：先按 [`../README.md`](../README.md) 的「数据结构」一节建立写入侧的字段映射表，再动字段。语义漂移只有这一处能发现。

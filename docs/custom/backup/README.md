@@ -5,7 +5,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | `README.md` | 归档格式、恢复流程、分流判据、附件替换、原件归档、索引重建、已知限制 |
-| `importer.md` | 结构分叉后的转换：读取层、写入与字段映射、settings、附件路径重写 |
+| `importer.md` | 结构分叉后的转换：接入方式、读取层、写入、附件路径重写、settings |
 | `acceptance.md` | 验收判据、样本类别、规范化规则、跑法、当前覆盖范围 |
 
 ## 归档格式
@@ -34,7 +34,7 @@ upload/ skills/ fonts/ media_creation/     附件，可选择不备份
 
 失败都在 publish 之前发生，staging 在 `finally` 里删掉，不会污染正在用的数据。
 
-同一个 zip 换到另一个安装（官方版、我们的 debug 或 release、旧包名的构建）上恢复时，迁移链不改数据，库里留着的还是生产者那一侧的绝对 `file://` 路径，附件会全部失配。这一步由 `OfficialForeignAttachmentPaths` 探测：命中就改走转换器，见 [`importer.md`](importer.md)。
+同一个 zip 换到另一个安装（官方版、我们的 debug 或 release、旧包名的构建）上恢复时，迁移链不改数据，库里留着的还是生产者那一侧的绝对 `file://` 路径，附件会全部失配。这种情况在分流之后还要再分一次流，见下一节。
 
 ## 分流
 
@@ -60,19 +60,7 @@ version == ourVersion：
 
 还有一种三种判定都拦不住的：两边 DDL 与 identity 都一样，但我们改了某个字段的含义。Room 会照常打开，读出来的是错的。identity 是 schema 的 hash，不含字段语义，所以它不会因为语义变化而变，任何基于 header 的判定都识别不出这一种。它只能靠改字段时同步维护写入侧的字段映射来保证，属于流程约束，不是机制保证；映射的现状见 [`importer.md`](importer.md)。
 
-## 转换流程
-
-分叉之后，导入器不改正在用的库，而是造一份结构等同于当前版本的库，再走现有安装流程：
-
-1. 解压到 `PendingRestore.createStagingDirectory()` 的 `preparing-*` 目录，保留 `rikka_hub-wal` 这类旧格式条目。
-2. `OfficialDatabaseReader` 把官方库读成行数据。
-3. 在 staging 的 `payload/database/` 下新建空的 Room 库，把行数据写进去。
-   - 文件名必须是 `rikka_hub`：`PendingRestore.buildEntries` 按 `database/<name>` 识别，`targetFile` 也只接受这个名字，其他名字会在 apply 时直接报错。
-   - 写完后按现有顺序收尾：`try { checkpoint } finally { close }`，再 `removeSidecars`。留着非空的 `-wal` 会让 `buildEntries` 对同一路径生成两条 entry。
-4. settings 按原流程迁移、解码、重新编码，`launchCount` 一并带进 pending 的 `settings.json`。
-5. `PendingRestore.publish(staging)`，重启时原子替换。
-
-payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/files/<附件路径>`，`settings.json` 放在 staging 根。payload 为空时 `apply` 会写一份空 journal 然后返回 true，也就是「静默成功、什么都没装」，所以导入器必须确认至少写入了数据库或附件。
+这张表只描述 `OfficialRestorePlanner`。另有一种情况在判定之后还要再分一次流：同版本、同 identity，但库里的文本列还带着别的安装的 `file://` 前缀，官方备份与我们别的包名（debug、release、改包名前的构建）产出的备份都是这样。`OfficialForeignAttachmentPaths` 会探一次，命中就改走转换器重写路径（C25）。
 
 ## 附件替换
 
@@ -103,7 +91,7 @@ payload 的布局沿用现有约定：`payload/database/rikka_hub`、`payload/fi
 
 ## 索引重建
 
-`message_fts*` 不在 Room 的 schema 里，`AppDatabaseFactory.onOpen` 只保证表存在，内容要重建。
+`message_fts*` 不在 Room 的 schema 里，`AppDatabaseFactory.onOpen` 只保证表存在，内容要重建。要不要重建由 `message_fts_state` 表里的 `rebuild_complete` 决定，表与判定都属于 C27。
 
 恢复成功那一次要触发重建。`PendingRestore.apply` 返回 `Boolean`，`RikkaHubApp.onCreate` 把它提到 `try` 块外面接住，在 `startKoin` 之后用这个值触发，否则那时还没有 `ConversationRepository`。
 
