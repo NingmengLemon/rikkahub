@@ -123,6 +123,29 @@ class OfficialBackupRestoreAcceptanceTest {
             expectedSettings.getValue("providers").jsonPrimitive.int,
             (settings["providers"]?.jsonArray)?.size,
         )
+        // 条数对不代表条目对：id 集合、当前助手与当前模型都要原样保留
+        assertEquals(
+            "助手 id 集合",
+            expectedSettings.getValue("assistantIds").jsonArray.map { it.jsonPrimitive.content }.toSet(),
+            settings["assistants"]?.jsonArray.orEmpty()
+                .map { it.jsonObject.getValue("id").jsonPrimitive.content }.toSet(),
+        )
+        assertEquals(
+            "服务商 id 集合",
+            expectedSettings.getValue("providerIds").jsonArray.map { it.jsonPrimitive.content }.toSet(),
+            settings["providers"]?.jsonArray.orEmpty()
+                .map { it.jsonObject.getValue("id").jsonPrimitive.content }.toSet(),
+        )
+        assertEquals(
+            "当前助手",
+            expectedSettings.getValue("assistantId").jsonPrimitive.content,
+            settings.getValue("assistantId").jsonPrimitive.content,
+        )
+        assertEquals(
+            "当前模型",
+            expectedSettings.getValue("chatModelId").jsonPrimitive.content,
+            settings.getValue("chatModelId").jsonPrimitive.content,
+        )
     }
 
     private fun sha256(file: File): String {

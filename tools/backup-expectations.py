@@ -117,9 +117,15 @@ def main():
     if args.settings:
         with open(args.settings, encoding='utf-8') as handle:
             settings = json.load(handle)
+        assistant_ids = sorted(str(a.get('id')) for a in (settings.get('assistants') or []))
+        provider_ids = sorted(str(p.get('id')) for p in (settings.get('providers') or []))
         result['settings'] = {
-            'assistants': len(settings.get('assistants') or []),
-            'providers': len(settings.get('providers') or []),
+            'assistants': len(assistant_ids),
+            'providers': len(provider_ids),
+            'assistantIds': assistant_ids,
+            'providerIds': provider_ids,
+            'assistantId': settings.get('assistantId'),
+            'chatModelId': settings.get('chatModelId'),
         }
         print(f"settings: assistants={result['settings']['assistants']} "
               f"providers={result['settings']['providers']}")
