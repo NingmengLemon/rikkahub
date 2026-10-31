@@ -23,8 +23,14 @@
 import argparse
 import hashlib
 import json
+import re
 import sqlite3
 import struct
+
+# 附件引用是绝对 file:// 路径，包名与用户号都在里面，导入时会被换成本机路径。校验内容时
+# 把这段前缀统一成占位符，否则「路径被正确重写」会被当成「内容不一致」。
+FILE_PREFIX = re.compile(r'file:///data/(?:user/\d+|data)/[^/"\s]+/files/')
+FILE_PREFIX_PLACEHOLDER = 'file://<files>/'
 
 
 def cell(kind: bytes, payload: bytes) -> bytes:
@@ -43,7 +49,8 @@ def encode_row(values):
         elif isinstance(value, bytes):
             out += cell(b'B', value)
         else:
-            out += cell(b'T', str(value).encode('utf-8'))
+            text = FILE_PREFIX.sub(FILE_PREFIX_PLACEHOLDER, str(value))
+            out += cell(b'T', text.encode('utf-8'))
     return bytes(out)
 
 
