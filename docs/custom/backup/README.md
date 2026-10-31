@@ -28,7 +28,7 @@ upload/ skills/ fonts/ media_creation/     附件，可选择不备份
 
 1. 解压归档到 `PendingRestore.createStagingDirectory()` 出来的 `preparing-*` 目录。
 2. 对暂存库跑 `DatabaseBackup.normalize`，把源库的 `-wal` 合进主文件。
-3. 分流：只读 `user_version` 与 `room_master_table` 的指纹，判定迁移链 / 转换 / 拒绝（见下一节）。判为迁移链时还会探一次附件路径，带着别的安装的 `file://` 前缀就改走转换器。
+3. 分流：只读 `user_version` 与 `room_master_table` 的指纹，判定迁移链 / 转换 / 拒绝（见下一节）。判为迁移链时，只要源版本有快照，还会探一次附件路径，带着别的安装的 `file://` 前缀就改走转换器。
 4. 需要转换时，先把备份里的库读出来写进一份新建的当前版本库，用它替换暂存库（见 [`importer.md`](importer.md)）。
 5. 用 `AppDatabaseFactory.create(context, stagedDatabase.absolutePath)` 打开暂存库。Room 在这里校验 identity hash，并沿迁移链把低版本库升到当前版本。版本高于本仓库的库在第 3 步就被拒绝了，只有元数据读不出来时才会落到 Room 的 `onDowngrade` 抛错。
 6. 在 `try` 里 `DatabaseBackup.checkpoint(room.openHelper.writableDatabase)` 把 WAL 合进主文件，`finally` 里 `room.close()`，最后 `removeSidecars` 清掉 `-wal`/`-shm`。
