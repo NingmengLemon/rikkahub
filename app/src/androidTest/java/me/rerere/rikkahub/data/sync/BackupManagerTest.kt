@@ -3,6 +3,7 @@ package me.rerere.rikkahub.data.sync
 import android.content.Context
 import android.content.ContextWrapper
 import android.database.sqlite.SQLiteDatabase
+import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
@@ -253,6 +254,46 @@ class BackupManagerTest {
         )
         assertFalse(File(context.noBackupFilesDir, "backup-restore/pending").exists())
         assertEquals("live", probe(liveDatabase))
+    }
+
+    /**
+     * 同版本、结构一致，但库里的附件路径还指着别的安装（官方备份、或别的包名的我们）。
+     *
+     * 这种情况走迁移链不会改数据，装进来之后图片全断。它必须也过转换器，由写入层把文本列里
+     * 的路径重写成本机。
+     */
+    @Test fun foreignAttachmentPathsAreRewrittenOnSameVersionRestore() = runBlocking {
+        val source = File(directory, "foreign-paths")
+        val archive = File(directory, "foreign-paths.zip")
+        val foreign = "file:///data/user/0/me.rerere.rikkahub/files/upload/abc.png"
+        withRoom(source) { room ->
+            val db = room.openHelper.writableDatabase
+            db.execSQL(
+                "INSERT INTO ConversationEntity (id, title, nodes, create_at, update_at) " +
+                    "VALUES ('c1', 'demo', '[]', 1, 2)",
+            )
+            db.execSQL(
+                "INSERT INTO message_node (id, conversation_id, node_index, messages, select_index) " +
+                    "VALUES ('n1', 'c1', 0, ?, 0)",
+                arrayOf("""[{"type":"image","url":"$foreign"}]"""),
+            )
+            DatabaseBackup.checkpoint(db)
+        }
+        ZipOutputStream(archive.outputStream()).use { zip -> addFile(zip, DatabaseBackup.ARCHIVE_DATABASE, source) }
+
+        manager.stageRestore(archive, includeDatabase = true, includeFiles = false)
+
+        val staged = File(context.noBackupFilesDir, "backup-restore/pending/payload/database/rikka_hub")
+        assertTrue("暂存库应当存在", staged.isFile)
+        SQLiteDatabase.openDatabase(staged.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            val messages = db.rawQuery("SELECT messages FROM message_node WHERE id = 'n1'", null).use {
+                check(it.moveToFirst())
+                it.getString(0)
+            }
+            val ours = context.filesDir.toUri().toString().trimEnd('/') + "/upload/abc.png"
+            assertTrue("应当重写成本机路径，实际是 $messages", messages.contains(ours))
+            assertFalse("不应残留官方包的路径，实际是 $messages", messages.contains("me.rerere.rikkahub/files/"))
+        }
     }
 
     private fun probe(database: AppDatabase): String = database.openHelper.readableDatabase

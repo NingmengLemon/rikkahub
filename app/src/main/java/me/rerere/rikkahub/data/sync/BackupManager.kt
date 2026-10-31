@@ -28,6 +28,7 @@ import me.rerere.rikkahub.data.sync.official.OfficialDatabaseAdapter
 import me.rerere.rikkahub.data.sync.official.OfficialDatabaseConverter
 import me.rerere.rikkahub.data.sync.official.OfficialDatabaseHeaders
 import me.rerere.rikkahub.data.sync.official.OfficialDatabaseSchema
+import me.rerere.rikkahub.data.sync.official.OfficialForeignAttachmentPaths
 import me.rerere.rikkahub.data.sync.official.OfficialRestorePlan
 import me.rerere.rikkahub.data.sync.official.OfficialRestorePlanner
 import me.rerere.rikkahub.data.sync.official.OfficialSnapshots
@@ -180,21 +181,23 @@ class BackupManager(
                         // 判定只看元数据，在读任何业务表之前完成。读不出来就交给迁移链，
                         // 由 Room 自己报错，而不是在这里猜。
                         OfficialDatabaseHeaders.read(stagedDatabase)?.let { header ->
-                            when (val plan = OfficialRestorePlanner.plan(
+                            val filesUriPrefix = context.filesDir.toUri().toString().trimEnd('/') + "/"
+                            val plan = OfficialRestorePlanner.plan(
                                 version = header.version,
                                 identityHash = header.identityHash,
                                 ourVersion = OfficialDatabaseSchema.VERSION,
                                 ourIdentity = OfficialDatabaseSchema.IDENTITY_HASH,
                                 snapshots = OfficialSnapshots.BY_VERSION,
-                            )) {
-                                OfficialRestorePlan.Migrate -> Unit
-                                is OfficialRestorePlan.Convert -> {
-                                    val converted = File(staging, "converted-${stagedDatabase.name}")
-                                    OfficialDatabaseConverter(context).convert(stagedDatabase, converted)
-                                    check(stagedDatabase.delete()) { "Cannot replace staged database" }
-                                    Files.move(converted.toPath(), stagedDatabase.toPath())
-                                }
-                                is OfficialRestorePlan.Reject -> error(plan.reason)
+                            )
+                            // 同版本的库会直接走迁移链，而迁移链不改数据；如果里面还带着别的安装
+                            // 的附件路径（官方备份、或别的包名的我们），装进来之后图片就全断了。
+                            // 这种情况也交给转换器：它写文本列时会把路径重写成本机。
+                            val rewriteNeeded = plan == OfficialRestorePlan.Migrate &&
+                                OfficialForeignAttachmentPaths.hasForeign(stagedDatabase, filesUriPrefix)
+                            when {
+                                plan is OfficialRestorePlan.Reject -> error(plan.reason)
+                                plan is OfficialRestorePlan.Convert || rewriteNeeded ->
+                                    convertStagedDatabase(context, staging, stagedDatabase)
                             }
                         }
                         // Reject unsupported schemas before publishing; run supported old migrations on the copy.
@@ -231,6 +234,18 @@ class BackupManager(
             }
         }
 
+    /**
+     * 把暂存库转成当前版本并替换掉它。
+     *
+     * 转换器写文本列时会把带别的安装路径的附件引用重写成当前安装的，所以两条路都要经过它：
+     * 版本/结构不一致的库，以及结构一致但带着外来路径的库。
+     */
+    private suspend fun convertStagedDatabase(context: Context, staging: File, stagedDatabase: File) {
+        val converted = File(staging, "converted-${stagedDatabase.name}")
+        OfficialDatabaseConverter(context).convert(stagedDatabase, converted)
+        check(stagedDatabase.delete()) { "Cannot replace staged database" }
+        Files.move(converted.toPath(), stagedDatabase.toPath())
+    }
     private fun isAttachment(name: String): Boolean {
         val folder = name.substringBefore('/')
         if (folder !in ATTACHMENT_FOLDERS || '/' !in name) return false
