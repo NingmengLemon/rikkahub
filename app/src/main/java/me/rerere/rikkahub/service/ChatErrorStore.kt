@@ -33,8 +33,6 @@ class ChatErrorStore(
         val conversationId: Uuid,
         val timestamp: Long,
         val solution: String? = null,
-        val retryable: Boolean = false,
-        val retryMessageId: Uuid? = null,
     )
 
     suspend fun load(): List<ChatError> = withContext(Dispatchers.IO) {
@@ -50,8 +48,6 @@ class ChatErrorStore(
                     solution = stored.solution?.let { name ->
                         runCatching { ChatErrorSolution.valueOf(name) }.getOrNull()
                     },
-                    retryable = stored.retryable,
-                    retryMessageId = stored.retryMessageId,
                 )
             }
         }.getOrDefault(emptyList())
@@ -75,8 +71,6 @@ class ChatErrorStore(
                     conversationId = error.conversationId,
                     timestamp = error.timestamp,
                     solution = error.solution?.name,
-                    retryable = error.retryable,
-                    retryMessageId = error.retryMessageId,
                 )
             }
             FileOutputStream(temporary).use { output ->

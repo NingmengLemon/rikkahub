@@ -195,144 +195,56 @@ class AgentLoopTest {
     }
 
     @Test
-    fun `context overflow asks the hook once and retries`() = runTest {
+    fun `heartbeats reset the idle timer without changing the message`() = runTest {
         provider.stream {
-            throw LlmFailure("too long", LlmFailureCode.CONTEXT_WINDOW_EXCEEDED)
-        }
-        provider.stream {
+            repeat(3) {
+                delay(600)
+                emit(StreamChunk.Heartbeat)
+            }
             text("hello")
             finish()
         }
-        var hookCalls = 0
-        val overflowHooks = object : AgentHooks by hooks {
-            override suspend fun onContextOverflow(): Boolean {
-                hookCalls++
-                return true
-            }
-        }
 
-        val events = runToEnd(
-            request(
-                retry = RetryPolicy.NETWORK.copy(
-                    initialDelay = Duration.ZERO,
-                    jitterRatio = 0.0,
-                )
-            ),
-            overflowHooks,
-        )
+        val events = runToEnd(request(streamIdleTimeout = 1.seconds))
 
         val finished = events.finished()
         assertEquals(AgentFinishReason.Completed, finished.reason)
         assertEquals(listOf("hello"), finished.message.texts())
-        assertEquals(1, hookCalls)
-        assertEquals(2, provider.requests.size)
-        assertTrue(events.filterIsInstance<AgentEvent.Retrying>().isEmpty())
+        assertEquals(1, provider.requests.size)
     }
 
     @Test
-    fun `context overflow after a tool step retries the request`() = runTest {
-        val executed = mutableListOf<String>()
-        val search = tool("search") { args ->
-            executed += args.jsonObject["q"]?.jsonPrimitive?.content.orEmpty()
-            listOf(UIMessagePart.Text("result"))
+    fun `effective tool timeout takes the larger of outer and declared`() {
+        assertEquals(5.seconds, effectiveToolTimeout(1.seconds, 5_000))
+        assertEquals(2.seconds, effectiveToolTimeout(2.seconds, 1_000))
+        assertEquals(3.seconds, effectiveToolTimeout(3.seconds, null))
+        assertNull(effectiveToolTimeout(null, 5_000))
+    }
+
+    @Test
+    fun `declared tool timeout is not cut short by a shorter outer timeout`() = runTest {
+        val slow = tool("slow", timeoutMillis = 2_000) {
+            delay(1_500)
+            listOf(UIMessagePart.Text("done"))
         }
         provider.stream {
-            toolCall("call-1", "search", """{"q":"kotlin"}""")
+            toolCall("call-1", "slow", "{}")
             finish()
-        }
-        provider.stream {
-            throw LlmFailure("too long after tool", LlmFailureCode.CONTEXT_WINDOW_EXCEEDED)
         }
         provider.stream {
             text("answer")
             finish()
         }
-        var hookCalls = 0
-        val overflowHooks = object : AgentHooks by hooks {
-            override suspend fun onContextOverflow(): Boolean {
-                hookCalls++
-                return true
-            }
-        }
 
-        val events = runToEnd(
-            request(
-                tools = listOf(search),
-                retry = RetryPolicy.NETWORK.copy(
-                    initialDelay = Duration.ZERO,
-                    jitterRatio = 0.0,
-                ),
-            ),
-            overflowHooks,
-        )
+        val events = runToEnd(request(tools = listOf(slow), toolTimeout = 1.seconds))
 
         val finished = events.finished()
         assertEquals(AgentFinishReason.Completed, finished.reason)
-        assertEquals(listOf("answer"), finished.message.texts())
-        assertEquals(1, hookCalls)
-        assertEquals(3, provider.requests.size)
-        assertEquals(listOf("kotlin"), executed)
-        assertTrue(events.filterIsInstance<AgentEvent.Retrying>().isEmpty())
-    }
-
-    @Test
-    fun `context overflow is only retried once`() = runTest {
-        provider.stream {
-            throw LlmFailure("too long once", LlmFailureCode.CONTEXT_WINDOW_EXCEEDED)
-        }
-        provider.stream {
-            throw LlmFailure("too long twice", LlmFailureCode.CONTEXT_WINDOW_EXCEEDED)
-        }
-        var hookCalls = 0
-        val overflowHooks = object : AgentHooks by hooks {
-            override suspend fun onContextOverflow(): Boolean {
-                hookCalls++
-                return true
-            }
-        }
-
-        val error = runCatching {
-            runToEnd(
-                request(
-                    retry = RetryPolicy.NETWORK.copy(
-                        initialDelay = Duration.ZERO,
-                        jitterRatio = 0.0,
-                    )
-                ),
-                overflowHooks,
-            )
-        }.exceptionOrNull()
-
-        assertTrue(error is LlmFailure)
-        assertEquals(LlmFailureCode.CONTEXT_WINDOW_EXCEEDED, (error as LlmFailure).code)
-        assertEquals(1, hookCalls)
-        assertEquals(2, provider.requests.size)
-    }
-
-    @Test
-    fun `context overflow keeps the previewed message id`() = runTest {
-        provider.stream {
-            text("partial")
-            throw LlmFailure("too long", LlmFailureCode.CONTEXT_WINDOW_EXCEEDED)
-        }
-        provider.stream {
-            text("done")
-            finish()
-        }
-        var hookCalls = 0
-        val overflowHooks = object : AgentHooks by hooks {
-            override suspend fun onContextOverflow(): Boolean {
-                hookCalls++
-                return true
-            }
-        }
-
-        val events = runToEnd(request(), overflowHooks)
-
-        assertEquals(1, hookCalls)
-        assertEquals(2, provider.requests.size)
-        assertEquals(1, events.messageIds().size)
-        assertEquals(listOf("done"), events.finished().message.texts())
+        val toolPart = finished.message.getTools().single { it.toolCallId == "call-1" }
+        assertEquals(
+            listOf("done"),
+            toolPart.output.filterIsInstance<UIMessagePart.Text>().map { it.text },
+        )
     }
 
     @Test
@@ -871,8 +783,15 @@ private suspend fun FlowCollector<StreamChunk>.finish() {
 private fun tool(
     name: String,
     needsApproval: Boolean = false,
+    timeoutMillis: Long? = null,
     execute: suspend (JsonElement) -> List<UIMessagePart> = { ok() },
-) = Tool(name = name, description = name, needsApproval = { needsApproval }, execute = execute)
+) = Tool(
+    name = name,
+    description = name,
+    needsApproval = { needsApproval },
+    timeoutMillis = timeoutMillis,
+    execute = execute,
+)
 
 private fun ok() = listOf(UIMessagePart.Text("ok"))
 

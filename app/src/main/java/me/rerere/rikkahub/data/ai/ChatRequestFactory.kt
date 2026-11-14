@@ -10,7 +10,6 @@ import me.rerere.ai.agent.AgentRequest
 import me.rerere.ai.agent.RetryPolicy
 import me.rerere.ai.agent.StepRequest
 import me.rerere.ai.agent.withRetry
-import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.core.Tool
 import me.rerere.ai.provider.Model
@@ -57,23 +56,13 @@ import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.data.repository.memoryId
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 private const val TAG = "ChatRequestFactory"
 
-/** 上下文超限后取最后一条 user 起的窗口，至少两条且必须比原窗口小；返回 null 表示无法安全缩。 */
-internal fun overflowWindow(messages: List<UIMessage>): List<UIMessage>? {
-    val lastUser = messages.indexOfLast { it.role == MessageRole.USER }
-    if (lastUser < 0) return null
-    val start = if (messages.size - lastUser >= 2) {
-        lastUser
-    } else {
-        messages.subList(0, lastUser).indexOfLast { it.role == MessageRole.USER }
-            .takeIf { it >= 0 } ?: lastUser
-    }
-    val window = messages.drop(start)
-    return window.takeIf { it.size >= 2 && it.size < messages.size }
-}
+/** 流式空闲看门狗的超时；[NetworkSetting.streamIdleTimeoutEnabled] 关掉时整条看门狗不生效 */
+private val STREAM_IDLE_TIMEOUT = 90.seconds
 
 /**
  * 一轮对话的请求上下文，按会话固定的配置解析一次。
@@ -180,23 +169,19 @@ class ChatRequestFactory(
             tools = turn.tools,
             stream = turn.assistant.streamOutput,
             retry = turn.settings.retryPolicy(),
+            toolTimeout = turn.settings.agentSetting.toolTimeoutSeconds
+                .takeIf { it > 0 }
+                ?.seconds,
+            streamIdleTimeout = if (turn.settings.networkSetting.streamIdleTimeoutEnabled) {
+                STREAM_IDLE_TIMEOUT
+            } else {
+                null
+            },
         )
-        var lastLimitedMessages: List<UIMessage> = emptyList()
-        var shrinkActive = false
         val hooks = object : AgentHooks {
             override suspend fun prepareStep(messages: List<UIMessage>): StepRequest {
                 Log.i(TAG, "prepareStep: ${turn.model.id}")
-                lastLimitedMessages = messages.filterModelVisible().withoutCompressionScratch()
-                    .limitContext(turn.assistant.contextMessageLimit)
-                return buildStep(turn, messages, processingStatus, shrinkActive)
-            }
-
-            override suspend fun onContextOverflow(): Boolean {
-                if (shrinkActive) return false
-                val window = overflowWindow(lastLimitedMessages) ?: return false
-                shrinkActive = true
-                Log.i(TAG, "context overflow: shrank ${lastLimitedMessages.size} -> ${window.size} messages")
-                return true
+                return buildStep(turn, messages, processingStatus)
             }
 
             override suspend fun previewStep(message: UIMessage, newPartsFrom: Int) =
@@ -271,7 +256,6 @@ class ChatRequestFactory(
         turn: ChatTurnContext,
         messages: List<UIMessage>,
         processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
-        shrinkActive: Boolean = false,
     ): StepRequest {
         val assistant = turn.assistant
         val visibleMessages = messages.filterModelVisible().withoutCompressionScratch()
@@ -302,15 +286,7 @@ class ChatRequestFactory(
                 add(UIMessage.system(prompt = system).copy(isSynthetic = true))
             }
             val limited = visibleMessages.limitContext(assistant.contextMessageLimit)
-            val window = if (shrinkActive) overflowWindow(limited) ?: limited else limited
-            val pruned = pruneContextForRequest(window, turn.model.contextLength)
-            if (pruned.toolResultCount > 0 || pruned.imageCount > 0) {
-                Log.i(
-                    TAG,
-                    "Pruned ${pruned.toolResultCount} tool results and ${pruned.imageCount} images to fit the context window",
-                )
-            }
-            addAll(pruned.messages)
+            addAll(limited)
         }.transforms(
             transformers = inputTransformers,
             context = context,
@@ -383,14 +359,13 @@ internal fun backgroundTextGenerationParams(
     sessionId = sessionId.toString(),
 )
 
-internal fun Settings.retryPolicy(): RetryPolicy =
-    if (networkSetting.enableAutoRetry) {
-        RetryPolicy.NETWORK.copy(
-            maxRetries = networkSetting.maxRetries.coerceIn(0, NetworkSetting.MAX_RETRIES),
-        )
-    } else {
-        RetryPolicy.NONE
-    }
+/**
+ * 自动重试暂时整体下线：重试以 agent step 为单位，失败后会把已生成的内容整条重放，
+ * 半截内容被吞回去的情况比可恢复的错误更常见。这里先恒返回 [RetryPolicy.NONE]，
+ * `NetworkSetting.enableAutoRetry` 与 `maxRetries` 字段和已保存的设置都保留，等失败恢复
+ * 与消息模型打磨好之后再接线。调用方不需要改。
+ */
+internal fun Settings.retryPolicy(): RetryPolicy = RetryPolicy.NONE
 
 /** 临时换模型时本次请求不带 Claude 的 cache_control；缓存前缀已经对不上，写缓存没有意义。 */
 internal fun ProviderSetting.withoutClaudePromptCache(): ProviderSetting = when (this) {

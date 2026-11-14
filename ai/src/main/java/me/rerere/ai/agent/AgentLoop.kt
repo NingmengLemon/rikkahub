@@ -16,6 +16,7 @@ import kotlinx.serialization.json.put
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.sum
 import me.rerere.ai.provider.TextGenerationParams
+import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.StreamChunkHandler
 import me.rerere.ai.ui.ToolApprovalState
 import me.rerere.ai.ui.UIMessage
@@ -26,6 +27,7 @@ import me.rerere.ai.util.LlmFailureCode
 import me.rerere.ai.util.json
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
@@ -61,14 +63,9 @@ internal class AgentLoop(
 
     suspend fun run() {
         var steps = 0
-        var contextOverflowRetried = false
-        var retryingStep = false
         while (true) {
             val current = message
-            if (retryingStep) {
-                // 缩窗重试要回到请求，不能把“工具都执行完了”误判成 Completed
-                retryingStep = false
-            } else if (current != null && current.getTools().any { !it.isExecuted }) {
+            if (current != null && current.getTools().any { !it.isExecuted }) {
                 val pending = requestApprovals(current)
                 if (pending.isNotEmpty()) return finish(AgentFinishReason.AwaitingApproval(pending))
                 executeTools()
@@ -76,19 +73,7 @@ internal class AgentLoop(
                 return finish(AgentFinishReason.Completed)
             }
             if (steps == request.maxSteps) return finish(AgentFinishReason.StepLimitReached)
-            try {
-                generateStep()
-            } catch (e: LlmFailure) {
-                if (!contextOverflowRetried &&
-                    e.code == LlmFailureCode.CONTEXT_WINDOW_EXCEEDED &&
-                    hooks.onContextOverflow()
-                ) {
-                    contextOverflowRetried = true
-                    retryingStep = true
-                    continue
-                }
-                throw e
-            }
+            generateStep()
             steps++
         }
     }
@@ -151,6 +136,8 @@ internal class AgentLoop(
                 } ?: chunks
                 try {
                     timedChunks.collect { chunk ->
+                        // 心跳只用来重置空闲看门狗，不改变消息，也不触发 preview
+                        if (chunk is StreamChunk.Heartbeat) return@collect
                         try {
                             val mark = firstChunk ?: TimeSource.Monotonic.markNow().also { firstChunk = it }
                             attempt = handler.handle(listOf(attempt), chunk).single()
@@ -246,7 +233,9 @@ internal class AgentLoop(
         val definition = findTool(tool.toolName) ?: error("Tool ${tool.toolName} not found")
         val args = runCatching { json.parseToJsonElement(tool.input.ifBlank { "{}" }) }
             .getOrElse { error("Invalid tool arguments JSON for ${tool.toolName}: ${it.message}") }
-        val output = executeToolWithTimeout(tool.toolName) { definition.execute(args) }
+        val output = executeToolWithTimeout(tool.toolName, definition.timeoutMillis) {
+            definition.execute(args)
+        }
         output.ifEmpty { listOf(UIMessagePart.Text(EMPTY_TOOL_OUTPUT)) }
     } catch (e: CancellationException) {
         // 取消必须向上传播，否则停止生成会被误报为工具执行错误
@@ -259,6 +248,7 @@ internal class AgentLoop(
 
     private suspend fun executeToolWithTimeout(
         toolName: String,
+        declaredTimeoutMillis: Long?,
         execute: suspend () -> List<UIMessagePart>,
     ): List<UIMessagePart> {
         suspend fun call(): List<UIMessagePart> = try {
@@ -269,7 +259,8 @@ internal class AgentLoop(
             errorOutput("Tool $toolName timed out internally")
         }
 
-        val timeout = request.toolTimeout ?: return call()
+        // 外层超时不能先于工具自身声明的超时触发，两者都在时取较大值
+        val timeout = effectiveToolTimeout(request.toolTimeout, declaredTimeoutMillis) ?: return call()
         return withTimeoutOrNull(timeout) { call() }
             ?: errorOutput("Tool execution timed out after ${timeout.inWholeSeconds}s")
     }
@@ -301,6 +292,10 @@ private fun UIMessage.hasGeneratedContent(from: Int = 0): Boolean = parts.drop(f
 
 private fun errorOutput(error: String): List<UIMessagePart> =
     listOf(UIMessagePart.Text(buildJsonObject { put("error", error) }.toString()))
+
+/** 外层工具超时与工具自身声明的超时取较大值；外层为空表示不限制。 */
+internal fun effectiveToolTimeout(outer: Duration?, declaredMillis: Long?): Duration? =
+    outer?.let { maxOf(it, declaredMillis?.milliseconds ?: Duration.ZERO) }
 
 // 把本步的 usage 和生成耗时累加到之前步骤的统计上；接收者只带本步的 usage
 private fun UIMessage.withStepStats(stepBase: UIMessage, stepTime: Duration): UIMessage = copy(

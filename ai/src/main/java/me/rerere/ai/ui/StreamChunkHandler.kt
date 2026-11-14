@@ -312,6 +312,7 @@ class StreamChunkHandler(private val model: Model? = null) {
                 }
             }
 
+            is StreamChunk.Heartbeat -> this
             is StreamChunk.ImageEnd -> this.also { imagePartIndexes.remove(chunk.id) }
             is StreamChunk.Annotations -> copy(annotations = (annotations + chunk.annotations).distinct())
             is StreamChunk.Usage -> copy(usage = usage.merge(chunk.usage))

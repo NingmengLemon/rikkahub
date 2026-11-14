@@ -11,17 +11,16 @@ import me.rerere.ai.core.Tool
 import me.rerere.ai.ui.DiffMetadata
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.ai.ui.toMetadata
+import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.utils.generateUnifiedDiff
 import me.rerere.workspace.WorkspaceCapabilities
 import me.rerere.workspace.WorkspaceFileEntry
 import me.rerere.workspace.WorkspaceLayout
-import me.rerere.workspace.WorkspaceManager
 import org.koin.java.KoinJavaComponent.getKoin
 import java.io.ByteArrayOutputStream
 
-private const val SHELL_TIMEOUT_MAX_SECONDS = 600L
 private const val MAX_READ_FILE_BYTES = 8L * 1024 * 1024
 
 val WorkspaceToolDefaultApprovals: Map<String, Boolean> = mapOf(
@@ -48,6 +47,12 @@ suspend fun createWorkspaceTools(
     val approvalOverrides = workspace.toolApprovalOverrides()
     fun needsApproval(name: String) = resolveWorkspaceToolApproval(name, approvalOverrides)
 
+    val agentSetting = getKoin().get<SettingsStore>().settingsFlow.value.agentSetting
+    val shellMaxSeconds = agentSetting.shellMaxTimeoutSeconds.coerceAtLeast(1).toLong()
+    val shellDefaultSeconds = agentSetting.shellDefaultTimeoutSeconds
+        .coerceIn(1, shellMaxSeconds.toInt())
+        .toLong()
+
     val shellCwd = cwd?.let(layout::relativeToWorkspace)
 
     return buildList {
@@ -56,7 +61,17 @@ suspend fun createWorkspaceTools(
             add(createWriteFileTool(workspaceId, layout, ::needsApproval, workspaceRepository))
             add(createEditFileTool(workspaceId, layout, ::needsApproval, workspaceRepository))
         }
-        add(createShellTool(workspaceId, layout, ::needsApproval, workspaceRepository, shellCwd))
+        add(
+            createShellTool(
+                workspaceId = workspaceId,
+                layout = layout,
+                needsApproval = ::needsApproval,
+                workspaceRepository = workspaceRepository,
+                defaultCwd = shellCwd,
+                defaultTimeoutSeconds = shellDefaultSeconds,
+                maxTimeoutSeconds = shellMaxSeconds,
+            )
+        )
     }
 }
 
@@ -217,6 +232,8 @@ private fun createShellTool(
     needsApproval: (String) -> Boolean,
     workspaceRepository: WorkspaceRepository,
     defaultCwd: String? = null,
+    defaultTimeoutSeconds: Long,
+    maxTimeoutSeconds: Long,
 ) = Tool(
     name = "workspace_shell",
     description = buildString {
@@ -251,7 +268,7 @@ private fun createShellTool(
                     put("type", "integer")
                     put(
                         "description",
-                        "Command timeout in seconds. Defaults to 30, max $SHELL_TIMEOUT_MAX_SECONDS."
+                        "Command timeout in seconds. Defaults to $defaultTimeoutSeconds, max $maxTimeoutSeconds."
                     )
                 })
             },
@@ -259,14 +276,16 @@ private fun createShellTool(
         )
     },
     needsApproval = { needsApproval("workspace_shell") },
+    // 外层工具超时至少要覆盖这个工具允许的最长命令时间，不能先于它触发
+    timeoutMillis = maxTimeoutSeconds * 1_000L,
     execute = {
         val params = it.jsonObject
         val command = params.string("command") ?: error("command is required")
         val cwd = layout.relativeToWorkspace(params.string("cwd") ?: defaultCwd.orEmpty())
         val timeoutMillis = params.string("timeout")?.toLongOrNull()
-            ?.coerceIn(1L, SHELL_TIMEOUT_MAX_SECONDS)
+            ?.coerceIn(1L, maxTimeoutSeconds)
             ?.times(1_000L)
-            ?: WorkspaceManager.DEFAULT_COMMAND_TIMEOUT_MS
+            ?: (defaultTimeoutSeconds * 1_000L)
         val result = workspaceRepository.executeCommand(workspaceId, command, cwd, timeoutMillis)
         listOf(
             UIMessagePart.Text(

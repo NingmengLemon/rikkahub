@@ -150,6 +150,14 @@ sealed class StreamChunk {
     @SerialName("annotations")
     data class Annotations(val annotations: List<UIMessageAnnotation>) : StreamChunk()
 
+    /**
+     * 协议层的保活事件（例如 Anthropic 的 `ping`）。不携带任何内容，只用来证明连接还活着，
+     * 让流式空闲看门狗在长思考期间不至于误判；AgentLoop 收到后直接跳过，不进入消息合并。
+     */
+    @Serializable
+    @SerialName("heartbeat")
+    data object Heartbeat : StreamChunk()
+
     @Serializable
     @SerialName("usage")
     data class Usage(val usage: TokenUsage) : StreamChunk()

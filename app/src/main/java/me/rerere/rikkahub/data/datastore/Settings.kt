@@ -54,6 +54,7 @@ data class Settings(
     val developerMode: Boolean = false,
     val displaySetting: DisplaySetting = DisplaySetting(),
     val networkSetting: NetworkSetting = NetworkSetting(),
+    val agentSetting: AgentSetting = AgentSetting(),
     val favoriteModels: List<Uuid> = emptyList(),
     val chatModelId: Uuid = Uuid.random(),
     val fastModelId: Uuid = Uuid.random(),
@@ -119,11 +120,24 @@ data class NetworkSetting(
     val enableAutoRetry: Boolean = true,
     // 自动重试的最大次数（不包含首次请求）；0 表示只发一次，不重试
     val maxRetries: Int = 3,
+    // 流式响应连续 90 秒没有任何数据（含 Anthropic 的保活 ping）时中断；关掉后只依赖网络层读超时。
+    // 自动重试下线期间这两个字段仍保留，恢复接线时直接读回
+    val streamIdleTimeoutEnabled: Boolean = true,
 ) {
     companion object {
         const val MAX_RETRIES = 10
     }
 }
+
+@Serializable
+data class AgentSetting(
+    // 单个工具调用的外层超时（秒）；0 表示不限制。实际生效取它与工具自身声明超时的较大值
+    val toolTimeoutSeconds: Int = 300,
+    // workspace_shell 的默认命令超时（秒）
+    val shellDefaultTimeoutSeconds: Int = 30,
+    // workspace_shell 允许请求的最大命令超时（秒），同时是外层工具超时的下限
+    val shellMaxTimeoutSeconds: Int = 600,
+)
 
 @Serializable
 enum class ChatFontFamily {

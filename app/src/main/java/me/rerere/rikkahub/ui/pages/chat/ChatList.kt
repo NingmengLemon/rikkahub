@@ -136,7 +136,6 @@ fun ChatList(
     errors: List<ChatError> = emptyList(),
     retryAttempts: List<RecordedRetryAttempt> = emptyList(),
     retryInProgress: Boolean = false,
-    onRetryError: ((ChatError) -> Unit)? = null,
     onDismissError: (Uuid) -> Unit = {},
     onClearAllErrors: () -> Unit = {},
     onRegenerate: (UIMessage) -> Unit = {},
@@ -183,7 +182,6 @@ fun ChatList(
                 errors = errors,
                 retryAttempts = retryAttempts,
                 retryInProgress = retryInProgress,
-                onRetryError = onRetryError,
                 onDismissError = onDismissError,
                 onClearAllErrors = onClearAllErrors,
                 onRegenerate = onRegenerate,
@@ -237,7 +235,6 @@ private fun ChatListNormal(
     errors: List<ChatError>,
     retryAttempts: List<RecordedRetryAttempt> = emptyList(),
     retryInProgress: Boolean = false,
-    onRetryError: ((ChatError) -> Unit)? = null,
     onDismissError: (Uuid) -> Unit,
     onClearAllErrors: () -> Unit,
     onRegenerate: (UIMessage) -> Unit,
@@ -527,9 +524,7 @@ private fun ChatListNormal(
                     onDismissError = onDismissError,
                     onClearAllErrors = onClearAllErrors,
                     autoDismiss = settings.displaySetting.autoDismissErrorCards,
-                    onRetryError = onRetryError,
-                    retryEnabled = !loading && !selecting && !conversation.isAwaitingToolApproval,
-                )
+                    )
             }
 
             // 完成选择

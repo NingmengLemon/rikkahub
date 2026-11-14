@@ -84,6 +84,12 @@ fun SettingPreferencesPage() {
                         supportingContent = { Text(stringResource(R.string.setting_page_preferences_ui_desc)) },
                     )
                     item(
+                        onClick = { navController.navigate(Screen.SettingPreferencesAgent) },
+                        leadingContent = { CardGroupIcon(HugeIcons.Settings03, containerColor = containerColor, contentColor = contentColor) },
+                        headlineContent = { Text(stringResource(R.string.setting_page_preferences_agent)) },
+                        supportingContent = { Text(stringResource(R.string.setting_page_preferences_agent_desc)) },
+                    )
+                    item(
                         onClick = { navController.navigate(Screen.SettingPreferencesNetwork) },
                         leadingContent = { CardGroupIcon(HugeIcons.Internet, containerColor = containerColor, contentColor = contentColor) },
                         headlineContent = { Text(stringResource(R.string.setting_page_preferences_network)) },

@@ -28,6 +28,8 @@ internal class ClaudeStreamDecoder : StreamChunkDecoder {
     override fun accept(event: SseEvent): DecodeResult {
         if (finished) return DecodeResult(completed = true)
         if (event.data == "[DONE]") return DecodeResult(finish(), completed = true)
+        // ping 不携带内容，但会周期性到达；转成心跳让流式空闲看门狗重置
+        if (event.event == "ping") return DecodeResult(listOf(StreamChunk.Heartbeat))
 
         val dataJson = json.parseToJsonElement(event.data).jsonObject
         if (event.event == "error") {
