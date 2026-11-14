@@ -491,15 +491,15 @@
 - 落点：`ErrorParser.kt` 新增 `LlmFailureCode`、`LlmFailure`，`HttpException` 带上 code、HTTP status 和 `Retry-After`；`toHttpException`、`withResponse` 负责从响应归一化。五个聊天 provider 接线点（Claude、ChatCompletions、Responses、Google generateContent、Interactions）的非流式非 2xx 改抛 `HttpException`，流式 `onFailure` 的解析错误附加响应状态，空响应体也保留状态。`RetryPolicy` 改为按错误码允许列表重试，支持 `maxDelay`、10% jitter 和 `Retry-After`；`AgentLoop` 在流式和非流式路径把空回复包成 `EMPTY_RESPONSE`，进入同一重试循环。
 - 理由：原来只按 `IOException` 判断，HTTP 429/5xx 的 JSON 错误大多不重试；空回复直接以完成状态落库；重试固定 1s/2s/4s，没有 jitter，也不看服务端 `Retry-After`。
 - 合并注意：默认只重试 `RATE_LIMIT`、`SERVER`、`TIMEOUT`、`TRANSPORT`、`EMPTY_RESPONSE`；`AUTH`、`QUOTA`、`INVALID_REQUEST`、`CONTEXT_WINDOW_EXCEEDED` 不重试。C75 的 `NetworkSetting.maxRetries` 与开关已随重试整体下线，`Settings.retryPolicy()` 恒为 `RetryPolicy.NONE`，字段保留。`RetryPolicy` 的 `retryOn` 仍是可选的逃生口，自定义策略优先于码表。`Retry-After` 会被 `maxDelay` 截断，不做“服务端要求超过上限就放弃”的区分；jitter 固定 10%，测试用 `jitterRatio = 0`。空回复判定只把空白 Text/Reasoning 当空，Tool、图片、文档等 part 都算有内容；这会让某些本来静默成功的空回复变成重试后错误，是预期行为。结构化错误优先于 HTTP status，`insufficient_quota` 和嵌套 `QuotaFailure` 即使是 429 也归 `QUOTA` 且不重试；没有 `QuotaFailure` 的 Google `RESOURCE_EXHAUSTED` 429 仍是 `RATE_LIMIT`，可重试。非 JSON body 只按 HTTP status 分类，不拿 HTML 里的关键词做信号。流式 onFailure 解析失败时用响应状态兜底，不再把 HTML 502 当序列化异常。`ai/build.gradle.kts` 打开 `unitTests.isReturnDefaultValues` 只是为了 provider 接线测试能调用 `Log`，范围仅限 `ai` 单测。C3 的 `ai/` 小改动原则下，这是第八处分叉。
-- 手动验收：用假 provider 或代理返回 429 带 `Retry-After`、5xx 带 JSON/HTML、401、402、400 context、空回复，确认重试次数和间隔符合码表；退避等待中停止生成应立即结束；重试后工具副作用不重复。
+- 手动验收：用假 provider 或代理返回 429 带 `Retry-After`、5xx 带 JSON/HTML、401、402、400 context、空回复，确认错误码分类正确。自动重试已整体下线，退避次数与等待间隔的样本等恢复接线后再跑；空回复现在直接出错误卡片，不再重试。
 - 测试：`RetryTest` 覆盖码表、`Retry-After` 原值和超过 `maxDelay` 的截断、jitter 归零后的固定间隔、`QUOTA` 不重试和取消；`ErrorParserTest` 覆盖 401/402/429/5xx/400 context 分类、结构化 `insufficient_quota`、嵌套 `QuotaFailure`、Gemini `RESOURCE_EXHAUSTED` 429 仍可重试、`withResponse` 保留结构化 code、HTTP date、非 JSON body 只按 status 分类和 `Retry-After` 解析；`AgentLoopTest` 覆盖流式和非流式空回复重试后成功；`ChatCompletionsErrorTest` 用假 interceptor 验证 429 `insufficient_quota` 到 `HttpException(status/code/Retry-After)` 的接线；`:ai:testDebugUnitTest` 全量通过；`:app:assembleGithubDebug` 通过。`:app:testGithubDebugUnitTest` 仍为已知 Windows 7 失败，本轮没有改 app。
 
 ### C62 流式 idle watchdog
 
 - 落点：`AgentRequest.streamIdleTimeout` 默认 90 秒；`AgentLoop.stream` 用 `Flow.timeout` 限制相邻 chunk 的等待，超时抛 `LlmFailure(TIMEOUT)`。Claude 的 `ping` 事件解码成 `StreamChunk.Heartbeat`，`AgentLoop` 收到后跳过、不触发 preview，但会重置看门狗；`NetworkSetting.streamIdleTimeoutEnabled`（默认 true）控制整条看门狗，关掉后在 `ChatRequestFactory.createAgent` 传 null。
 - 理由：Anthropic 长思考时可能长时间没有内容 chunk，只有 ping；只按内容 chunk 计时会把正常请求切断。自动重试下线期间超时直接出错误卡片，不重试。
-- 合并注意：`streamIdleTimeout <= 0` 仍会立即超时，调用方只传正数或 null；非流式请求不经过看门狗。新增 provider 若有自己的保活事件，按同样方式产出 `StreamChunk.Heartbeat`，不要在 `AgentLoop` 里按 provider 特判。
-- 测试：`AgentLoopTest` 覆盖空闲超时、chunk 重置、心跳重置与心跳不改变消息；`:ai:testDebugUnitTest` 通过。
+- 合并注意：`streamIdleTimeout <= 0` 仍会立即超时，调用方只传正数或 null；非流式请求不经过看门狗。新增 provider 若有自己的保活事件，按同样方式产出 `StreamChunk.Heartbeat`，不要在 `AgentLoop` 里按 provider 特判。设置入口在网络偏好页（`setting_page_preferences_network_stream_idle_timeout`），四种语言同步；关掉后 `ChatRequestFactory` 传 null，`AgentRequest.DEFAULT_STREAM_IDLE_TIMEOUT` 是 90 秒的唯一来源。
+- 测试：`AgentLoopTest` 覆盖空闲超时、chunk 重置、心跳重置与心跳不触发 preview；`ClaudeStreamDecoderTest` 覆盖 ping 解码成 `StreamChunk.Heartbeat`；`SettingsTimeoutsTest` 覆盖看门狗开关与工具超时的映射；`AgentSettingTest` 覆盖 `NetworkSetting.streamIdleTimeoutEnabled` 的旧 JSON 默认值；`:ai:testDebugUnitTest` 通过。
 
 ### C63 上下文超限自动缩窗
 
@@ -519,8 +519,8 @@
 
 - 落点：`ConversationMessages.kt` 的 `recoverInterruptedTool` 按 `startedAt` 区分 `not_started` 与 `outcome_unknown`，`cancelInterruptedTools` 和 `Conversation.withoutUnresumableToolCalls` 共用它，逐 part 替换不可恢复的 Tool part，保留文本与推理。`Tool` 增加 `timeoutMillis` 声明；`AgentRequest.toolTimeout` 与工具有效超时取两者的较大值（`effectiveToolTimeout`），外层不能先于工具自身的超时触发。`AgentSetting.toolTimeoutSeconds`（默认 300，0 表示不限制）控制外层超时；`workspace_shell` 的默认与最大命令超时来自 `AgentSetting.shellDefaultTimeoutSeconds`（默认 30）与 `shellMaxTimeoutSeconds`（默认 600），并据此声明 `timeoutMillis`。
 - 理由：原来所有中断都写成 `cancelled by user`，分不清工具是否已经产生副作用；工具错误把内部堆栈发给模型。超时固定 5 分钟又和 `workspace_shell` 自己允许的 600 秒冲突，模型要 600 秒会被外层先掐掉。
-- 合并注意：`timeoutMillis` 是工具声明，不是执行参数；外层设为不限制时整条外层超时关闭，工具内部超时保持各自逻辑。`withTimeoutOrNull` 是协作式取消，不挂起且不走 `runInterruptible` 的阻塞工具不会被按时打断。旧的 `toolTimeout <= 0` 立即超时的行为不再通过设置暴露，设置里 0 表示关闭。
-- 测试：`AgentLoopTest` 覆盖工具失败摘要、内部超时、外层超时、声明超时优先于较短外层超时，以及 `effectiveToolTimeout` 的合并规则；`AgentSettingTest` 覆盖默认值与往返。
+- 合并注意：`timeoutMillis` 是工具声明，不是执行参数；外层设为不限制时整条外层超时关闭，工具内部超时保持各自逻辑。声明值与外层相等时外层仍可能先触发计时，所以 `effectiveToolTimeout` 给声明值留 5 秒余量，让工具自己的计时先响。`withTimeoutOrNull` 是协作式取消，不挂起且不走 `runInterruptible` 的阻塞工具不会被按时打断。旧的 `toolTimeout <= 0` 立即超时的行为不再通过设置暴露，设置里 0 表示关闭。三个值在 `AgentSetting.normalized()` 里统一收口（`Settings.normalized()` 会调用），页面用收口后的值，避免导入或手改数据产生反向滑块区间。设置入口是新加的「工具」偏好页（`Screen.SettingPreferencesAgent`、`SettingPreferencesAgentPage`），四份 locale 同步。`createWorkspaceTools` 通过参数接收 `AgentSetting`，不再读 Koin 的全局设置。官方兼容导出会多出 `agentSetting` 与 `networkSetting.streamIdleTimeoutEnabled` 两个官方不认识的键，容忍方式与 C69/C75 相同；设备数据验收见 `backup/acceptance.md` 的 2026-11-14 记录。
+- 测试：`AgentLoopTest` 覆盖工具失败摘要、内部超时、外层超时、声明超时优先于较短外层超时（含 5 秒余量），以及 `effectiveToolTimeout` 的合并规则；`AgentSettingTest` 覆盖默认值、序列化往返、范围收口与 `NetworkSetting.streamIdleTimeoutEnabled` 的旧 JSON 默认值；`SettingsFieldsTest` 覆盖 `agent_setting` 的 DataStore 往返与 key 表。
 
 ### C66 消息队列恢复与回插
 

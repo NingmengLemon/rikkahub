@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.data.datastore.AgentSetting
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.components.ui.CardGroupValue
@@ -28,32 +29,33 @@ import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
 
 private const val TOOL_TIMEOUT_MIN_MINUTES = 1
-private const val TOOL_TIMEOUT_MAX_MINUTES = 30
-private const val TOOL_TIMEOUT_DEFAULT_SECONDS = 300
-private const val SHELL_MAX_MAX_SECONDS = 3600
+private const val MIN_SHELL_DEFAULT_SECONDS = 5
+private val TOOL_TIMEOUT_MAX_MINUTES = AgentSetting.MAX_TOOL_TIMEOUT_SECONDS / 60
 
 @Composable
 fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
     val settings by vm.settings.collectAsStateWithLifecycle()
-    val agent = settings.agentSetting
+    val agent = settings.agentSetting.normalized()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val toolMinutes = (agent.toolTimeoutSeconds / 60).coerceIn(TOOL_TIMEOUT_MIN_MINUTES, TOOL_TIMEOUT_MAX_MINUTES)
+    val shellMaxSeconds = agent.shellMaxTimeoutSeconds
+    val shellDefaultSeconds = agent.shellDefaultTimeoutSeconds.coerceAtLeast(MIN_SHELL_DEFAULT_SECONDS)
 
     fun updateToolTimeout(seconds: Int) = vm.updateSettings {
         it.copy(agentSetting = it.agentSetting.copy(toolTimeoutSeconds = seconds))
     }
 
     fun updateShellDefault(seconds: Int) = vm.updateSettings {
-        val max = it.agentSetting.shellMaxTimeoutSeconds
+        val max = it.agentSetting.shellMaxTimeoutSeconds.coerceAtLeast(MIN_SHELL_DEFAULT_SECONDS)
         it.copy(
             agentSetting = it.agentSetting.copy(
-                shellDefaultTimeoutSeconds = seconds.coerceIn(1, max),
+                shellDefaultTimeoutSeconds = seconds.coerceIn(MIN_SHELL_DEFAULT_SECONDS, max),
             ),
         )
     }
 
     fun updateShellMax(seconds: Int) = vm.updateSettings {
-        val max = seconds.coerceIn(60, SHELL_MAX_MAX_SECONDS)
+        val max = seconds.coerceIn(60, AgentSetting.MAX_SHELL_TIMEOUT_SECONDS)
         it.copy(
             agentSetting = it.agentSetting.copy(
                 shellMaxTimeoutSeconds = max,
@@ -84,7 +86,7 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
                     switchItem(
                         checked = agent.toolTimeoutSeconds > 0,
                         onCheckedChange = { enabled ->
-                            updateToolTimeout(if (enabled) TOOL_TIMEOUT_DEFAULT_SECONDS else 0)
+                            updateToolTimeout(if (enabled) AgentSetting.DEFAULT_TOOL_TIMEOUT_SECONDS else 0)
                         },
                         supportingContent = {
                             Text(stringResource(R.string.setting_page_agent_tool_timeout_desc))
@@ -134,22 +136,20 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
                             CardGroupValue(
                                 stringResource(
                                     R.string.setting_page_agent_seconds,
-                                    agent.shellDefaultTimeoutSeconds,
+                                    shellDefaultSeconds,
                                 )
                             )
                         },
                     ) {
                         Slider(
-                            value = agent.shellDefaultTimeoutSeconds
-                                .coerceAtMost(agent.shellMaxTimeoutSeconds)
-                                .toFloat(),
+                            value = shellDefaultSeconds.toFloat(),
                             onValueChange = { value ->
                                 val seconds = (value / 5).roundToInt() * 5
-                                if (seconds != agent.shellDefaultTimeoutSeconds) {
+                                if (seconds != shellDefaultSeconds) {
                                     updateShellDefault(seconds)
                                 }
                             },
-                            valueRange = 5f..agent.shellMaxTimeoutSeconds.toFloat(),
+                            valueRange = MIN_SHELL_DEFAULT_SECONDS.toFloat()..shellMaxSeconds.toFloat(),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -162,19 +162,19 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
                         },
                         trailingContent = {
                             CardGroupValue(
-                                stringResource(R.string.setting_page_agent_seconds, agent.shellMaxTimeoutSeconds)
+                                stringResource(R.string.setting_page_agent_seconds, shellMaxSeconds)
                             )
                         },
                     ) {
                         Slider(
-                            value = agent.shellMaxTimeoutSeconds.toFloat(),
+                            value = shellMaxSeconds.toFloat(),
                             onValueChange = { value ->
                                 val seconds = (value / 30).roundToInt() * 30
-                                if (seconds != agent.shellMaxTimeoutSeconds) {
+                                if (seconds != shellMaxSeconds) {
                                     updateShellMax(seconds)
                                 }
                             },
-                            valueRange = 60f..SHELL_MAX_MAX_SECONDS.toFloat(),
+                            valueRange = 60f..AgentSetting.MAX_SHELL_TIMEOUT_SECONDS.toFloat(),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }

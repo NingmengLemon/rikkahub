@@ -2,6 +2,7 @@ package me.rerere.rikkahub.data.datastore
 
 import me.rerere.rikkahub.utils.JsonInstant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentSettingTest {
@@ -15,13 +16,37 @@ class AgentSettingTest {
     }
 
     @Test
-    fun `timeouts round trip`() {
-        val decoded = JsonInstant.decodeFromString<AgentSetting>(
-            """{"toolTimeoutSeconds":0,"shellDefaultTimeoutSeconds":45,"shellMaxTimeoutSeconds":1200}"""
+    fun `timeouts survive a serialization round trip`() {
+        val original = AgentSetting(
+            toolTimeoutSeconds = 0,
+            shellDefaultTimeoutSeconds = 45,
+            shellMaxTimeoutSeconds = 1200,
         )
 
-        assertEquals(0, decoded.toolTimeoutSeconds)
-        assertEquals(45, decoded.shellDefaultTimeoutSeconds)
-        assertEquals(1200, decoded.shellMaxTimeoutSeconds)
+        val decoded = JsonInstant.decodeFromString<AgentSetting>(
+            JsonInstant.encodeToString(original)
+        )
+
+        assertEquals(original, decoded)
+    }
+
+    @Test
+    fun `values are clamped to their valid ranges`() {
+        val normalized = AgentSetting(
+            toolTimeoutSeconds = -5,
+            shellDefaultTimeoutSeconds = 9_000,
+            shellMaxTimeoutSeconds = 1,
+        ).normalized()
+
+        assertEquals(0, normalized.toolTimeoutSeconds)
+        assertEquals(AgentSetting.MIN_SHELL_TIMEOUT_SECONDS, normalized.shellMaxTimeoutSeconds)
+        assertEquals(AgentSetting.MIN_SHELL_TIMEOUT_SECONDS, normalized.shellDefaultTimeoutSeconds)
+    }
+
+    @Test
+    fun `stream idle watchdog is enabled for old network settings`() {
+        val decoded = JsonInstant.decodeFromString<NetworkSetting>("""{}""")
+
+        assertTrue(decoded.streamIdleTimeoutEnabled)
     }
 }

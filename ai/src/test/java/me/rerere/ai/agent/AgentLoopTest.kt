@@ -211,12 +211,16 @@ class AgentLoopTest {
         assertEquals(AgentFinishReason.Completed, finished.reason)
         assertEquals(listOf("hello"), finished.message.texts())
         assertEquals(1, provider.requests.size)
+        // 心跳不能触发 preview：否则会出现一条没有任何 part 的 MessageUpdated
+        val updates = events.filterIsInstance<AgentEvent.MessageUpdated>()
+        assertTrue(updates.isNotEmpty())
+        assertTrue(updates.none { it.message.parts.isEmpty() })
     }
 
     @Test
     fun `effective tool timeout takes the larger of outer and declared`() {
-        assertEquals(5.seconds, effectiveToolTimeout(1.seconds, 5_000))
-        assertEquals(2.seconds, effectiveToolTimeout(2.seconds, 1_000))
+        assertEquals(10.seconds, effectiveToolTimeout(1.seconds, 5_000))
+        assertEquals(6.seconds, effectiveToolTimeout(2.seconds, 1_000))
         assertEquals(3.seconds, effectiveToolTimeout(3.seconds, null))
         assertNull(effectiveToolTimeout(null, 5_000))
     }

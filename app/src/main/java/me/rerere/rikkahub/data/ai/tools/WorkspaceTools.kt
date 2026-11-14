@@ -11,7 +11,7 @@ import me.rerere.ai.core.Tool
 import me.rerere.ai.ui.DiffMetadata
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.ai.ui.toMetadata
-import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.datastore.AgentSetting
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.utils.generateUnifiedDiff
@@ -40,6 +40,7 @@ suspend fun createWorkspaceTools(
     workspaceId: String?,
     workspaceRepository: WorkspaceRepository,
     cwd: String? = null,
+    agentSetting: AgentSetting = AgentSetting(),
 ): List<Tool> {
     if (workspaceId.isNullOrBlank()) return emptyList()
     val layout = workspaceRepository.layout(workspaceId) ?: return emptyList()
@@ -47,11 +48,9 @@ suspend fun createWorkspaceTools(
     val approvalOverrides = workspace.toolApprovalOverrides()
     fun needsApproval(name: String) = resolveWorkspaceToolApproval(name, approvalOverrides)
 
-    val agentSetting = getKoin().get<SettingsStore>().settingsFlow.value.agentSetting
-    val shellMaxSeconds = agentSetting.shellMaxTimeoutSeconds.coerceAtLeast(1).toLong()
-    val shellDefaultSeconds = agentSetting.shellDefaultTimeoutSeconds
-        .coerceIn(1, shellMaxSeconds.toInt())
-        .toLong()
+    val normalized = agentSetting.normalized()
+    val shellMaxSeconds = normalized.shellMaxTimeoutSeconds.toLong()
+    val shellDefaultSeconds = normalized.shellDefaultTimeoutSeconds.toLong()
 
     val shellCwd = cwd?.let(layout::relativeToWorkspace)
 

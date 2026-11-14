@@ -28,6 +28,7 @@ import me.rerere.ai.util.json
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
@@ -47,7 +48,7 @@ internal class AgentLoop(
     // 本轮的助手消息；新的一轮在第一次请求模型时才创建
     private var message: UIMessage?
 
-    // overflow 重试复用第一次尝试的 base，避免 preview 已经写出的消息 id 被换掉
+    // 本步失败重试复用第一次尝试的 base，避免 preview 已经写出的消息 id 被换掉
     private var stepBase: UIMessage? = null
 
     init {
@@ -293,9 +294,15 @@ private fun UIMessage.hasGeneratedContent(from: Int = 0): Boolean = parts.drop(f
 private fun errorOutput(error: String): List<UIMessagePart> =
     listOf(UIMessagePart.Text(buildJsonObject { put("error", error) }.toString()))
 
+/** 工具声明超时之外再留的余量，保证同样的时长下先由工具自己的计时触发。 */
+private val DECLARED_TIMEOUT_GRACE = 5.seconds
+
 /** 外层工具超时与工具自身声明的超时取较大值；外层为空表示不限制。 */
 internal fun effectiveToolTimeout(outer: Duration?, declaredMillis: Long?): Duration? =
-    outer?.let { maxOf(it, declaredMillis?.milliseconds ?: Duration.ZERO) }
+    outer?.let { outerTimeout ->
+        val declared = declaredMillis?.milliseconds
+        if (declared == null) outerTimeout else maxOf(outerTimeout, declared + DECLARED_TIMEOUT_GRACE)
+    }
 
 // 把本步的 usage 和生成耗时累加到之前步骤的统计上；接收者只带本步的 usage
 private fun UIMessage.withStepStats(stepBase: UIMessage, stepTime: Duration): UIMessage = copy(

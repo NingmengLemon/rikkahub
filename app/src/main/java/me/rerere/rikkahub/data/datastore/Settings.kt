@@ -117,11 +117,11 @@ data class NetworkSetting(
     val proxyUrl: String = "",
     val proxyUsername: String = "",
     val proxyPassword: String = "",
+    // 自动重试暂时整体下线，这两个字段与已保存的 JSON 保留，恢复接线时直接读回
     val enableAutoRetry: Boolean = true,
     // 自动重试的最大次数（不包含首次请求）；0 表示只发一次，不重试
     val maxRetries: Int = 3,
-    // 流式响应连续 90 秒没有任何数据（含 Anthropic 的保活 ping）时中断；关掉后只依赖网络层读超时。
-    // 自动重试下线期间这两个字段仍保留，恢复接线时直接读回
+    // 流式响应连续 90 秒没有任何数据（含 Anthropic 的保活 ping）时中断；关掉后只依赖网络层读超时
     val streamIdleTimeoutEnabled: Boolean = true,
 ) {
     companion object {
@@ -132,12 +132,34 @@ data class NetworkSetting(
 @Serializable
 data class AgentSetting(
     // 单个工具调用的外层超时（秒）；0 表示不限制。实际生效取它与工具自身声明超时的较大值
-    val toolTimeoutSeconds: Int = 300,
+    val toolTimeoutSeconds: Int = DEFAULT_TOOL_TIMEOUT_SECONDS,
     // workspace_shell 的默认命令超时（秒）
-    val shellDefaultTimeoutSeconds: Int = 30,
+    val shellDefaultTimeoutSeconds: Int = DEFAULT_SHELL_DEFAULT_TIMEOUT_SECONDS,
     // workspace_shell 允许请求的最大命令超时（秒），同时是外层工具超时的下限
-    val shellMaxTimeoutSeconds: Int = 600,
-)
+    val shellMaxTimeoutSeconds: Int = DEFAULT_SHELL_MAX_TIMEOUT_SECONDS,
+) {
+    companion object {
+        const val DEFAULT_TOOL_TIMEOUT_SECONDS = 300
+        const val DEFAULT_SHELL_DEFAULT_TIMEOUT_SECONDS = 30
+        const val DEFAULT_SHELL_MAX_TIMEOUT_SECONDS = 600
+        const val MAX_TOOL_TIMEOUT_SECONDS = 30 * 60
+        const val MIN_SHELL_TIMEOUT_SECONDS = 5
+        const val MAX_SHELL_TIMEOUT_SECONDS = 3600
+    }
+
+    /** 读盘与修改后统一收口：默认值不超过上限，外层超时不能是负数。 */
+    fun normalized(): AgentSetting {
+        val maxSeconds = shellMaxTimeoutSeconds.coerceIn(
+            MIN_SHELL_TIMEOUT_SECONDS,
+            MAX_SHELL_TIMEOUT_SECONDS,
+        )
+        return copy(
+            toolTimeoutSeconds = toolTimeoutSeconds.coerceIn(0, MAX_TOOL_TIMEOUT_SECONDS),
+            shellMaxTimeoutSeconds = maxSeconds,
+            shellDefaultTimeoutSeconds = shellDefaultTimeoutSeconds.coerceIn(1, maxSeconds),
+        )
+    }
+}
 
 @Serializable
 enum class ChatFontFamily {

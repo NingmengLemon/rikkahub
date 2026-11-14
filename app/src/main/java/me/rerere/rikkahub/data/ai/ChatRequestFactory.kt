@@ -56,13 +56,11 @@ import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.data.repository.memoryId
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 private const val TAG = "ChatRequestFactory"
-
-/** 流式空闲看门狗的超时；[NetworkSetting.streamIdleTimeoutEnabled] 关掉时整条看门狗不生效 */
-private val STREAM_IDLE_TIMEOUT = 90.seconds
 
 /**
  * 一轮对话的请求上下文，按会话固定的配置解析一次。
@@ -169,14 +167,8 @@ class ChatRequestFactory(
             tools = turn.tools,
             stream = turn.assistant.streamOutput,
             retry = turn.settings.retryPolicy(),
-            toolTimeout = turn.settings.agentSetting.toolTimeoutSeconds
-                .takeIf { it > 0 }
-                ?.seconds,
-            streamIdleTimeout = if (turn.settings.networkSetting.streamIdleTimeoutEnabled) {
-                STREAM_IDLE_TIMEOUT
-            } else {
-                null
-            },
+            toolTimeout = turn.settings.toolExecutionTimeout(),
+            streamIdleTimeout = turn.settings.streamIdleWatchdog(),
         )
         val hooks = object : AgentHooks {
             override suspend fun prepareStep(messages: List<UIMessage>): StepRequest {
@@ -366,6 +358,18 @@ internal fun backgroundTextGenerationParams(
  * 与消息模型打磨好之后再接线。调用方不需要改。
  */
 internal fun Settings.retryPolicy(): RetryPolicy = RetryPolicy.NONE
+
+/** 流式空闲看门狗；关掉开关时整条看门狗不生效。 */
+internal fun Settings.streamIdleWatchdog(): Duration? =
+    if (networkSetting.streamIdleTimeoutEnabled) {
+        AgentRequest.DEFAULT_STREAM_IDLE_TIMEOUT
+    } else {
+        null
+    }
+
+/** 工具外层超时；设置里 0 表示不限制。 */
+internal fun Settings.toolExecutionTimeout(): Duration? =
+    agentSetting.toolTimeoutSeconds.takeIf { it > 0 }?.seconds
 
 /** 临时换模型时本次请求不带 Claude 的 cache_control；缓存前缀已经对不上，写缓存没有意义。 */
 internal fun ProviderSetting.withoutClaudePromptCache(): ProviderSetting = when (this) {

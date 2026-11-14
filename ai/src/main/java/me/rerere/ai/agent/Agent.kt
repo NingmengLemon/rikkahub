@@ -27,10 +27,14 @@ data class AgentRequest(
     val maxSteps: Int = 256,
     val retry: RetryPolicy = RetryPolicy.NONE,
     /** 流式相邻 chunk 的最长等待；null 关闭 watchdog */
-    val streamIdleTimeout: Duration? = 90.seconds,
+    val streamIdleTimeout: Duration? = DEFAULT_STREAM_IDLE_TIMEOUT,
     /** 单个客户端工具的最长执行时间；null 关闭超时 */
     val toolTimeout: Duration? = 5.minutes,
-)
+) {
+    companion object {
+        val DEFAULT_STREAM_IDLE_TIMEOUT = 90.seconds
+    }
+}
 
 /** 调用方在循环各个节点上的介入点 */
 interface AgentHooks {
