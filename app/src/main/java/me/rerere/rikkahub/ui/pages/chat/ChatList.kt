@@ -524,7 +524,7 @@ private fun ChatListNormal(
                     onDismissError = onDismissError,
                     onClearAllErrors = onClearAllErrors,
                     autoDismiss = settings.displaySetting.autoDismissErrorCards,
-                    )
+                )
             }
 
             // 完成选择

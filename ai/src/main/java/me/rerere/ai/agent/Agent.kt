@@ -28,7 +28,10 @@ data class AgentRequest(
     val retry: RetryPolicy = RetryPolicy.NONE,
     /** 流式相邻 chunk 的最长等待；null 关闭 watchdog */
     val streamIdleTimeout: Duration? = DEFAULT_STREAM_IDLE_TIMEOUT,
-    /** 单个客户端工具的最长执行时间；null 关闭超时 */
+    /**
+     * 单个客户端工具的外层超时下限；null 关闭外层超时。实际生效值还会与工具声明的
+     * [me.rerere.ai.core.Tool.timeoutMillis]（再加 5 秒余量）取较大值，见 `effectiveToolTimeout`。
+     */
     val toolTimeout: Duration? = 5.minutes,
 ) {
     companion object {

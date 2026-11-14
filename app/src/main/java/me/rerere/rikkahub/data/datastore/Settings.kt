@@ -142,21 +142,39 @@ data class AgentSetting(
         const val DEFAULT_TOOL_TIMEOUT_SECONDS = 300
         const val DEFAULT_SHELL_DEFAULT_TIMEOUT_SECONDS = 30
         const val DEFAULT_SHELL_MAX_TIMEOUT_SECONDS = 600
+        const val MIN_TOOL_TIMEOUT_SECONDS = 60
         const val MAX_TOOL_TIMEOUT_SECONDS = 30 * 60
-        const val MIN_SHELL_TIMEOUT_SECONDS = 5
+        const val TOOL_TIMEOUT_STEP_SECONDS = 60
+        const val MIN_SHELL_DEFAULT_TIMEOUT_SECONDS = 5
+        const val MIN_SHELL_TIMEOUT_SECONDS = 60
         const val MAX_SHELL_TIMEOUT_SECONDS = 3600
     }
 
-    /** 读盘与修改后统一收口：默认值不超过上限，外层超时不能是负数。 */
+    /**
+     * 读盘与修改后统一收口：工具超时对齐到分钟（0 保持关闭），shell 上限不小于 60 秒，
+     * shell 默认值落在页面默认滑块的下限与上限之间。
+     */
     fun normalized(): AgentSetting {
         val maxSeconds = shellMaxTimeoutSeconds.coerceIn(
             MIN_SHELL_TIMEOUT_SECONDS,
             MAX_SHELL_TIMEOUT_SECONDS,
         )
+        val toolSeconds = if (toolTimeoutSeconds <= 0) {
+            0
+        } else {
+            (toolTimeoutSeconds / TOOL_TIMEOUT_STEP_SECONDS)
+                .coerceIn(
+                    MIN_TOOL_TIMEOUT_SECONDS / TOOL_TIMEOUT_STEP_SECONDS,
+                    MAX_TOOL_TIMEOUT_SECONDS / TOOL_TIMEOUT_STEP_SECONDS,
+                ) * TOOL_TIMEOUT_STEP_SECONDS
+        }
         return copy(
-            toolTimeoutSeconds = toolTimeoutSeconds.coerceIn(0, MAX_TOOL_TIMEOUT_SECONDS),
+            toolTimeoutSeconds = toolSeconds,
             shellMaxTimeoutSeconds = maxSeconds,
-            shellDefaultTimeoutSeconds = shellDefaultTimeoutSeconds.coerceIn(1, maxSeconds),
+            shellDefaultTimeoutSeconds = shellDefaultTimeoutSeconds.coerceIn(
+                MIN_SHELL_DEFAULT_TIMEOUT_SECONDS,
+                maxSeconds,
+            ),
         )
     }
 }

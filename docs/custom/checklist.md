@@ -498,7 +498,7 @@
 
 - 落点：`AgentRequest.streamIdleTimeout` 默认 90 秒；`AgentLoop.stream` 用 `Flow.timeout` 限制相邻 chunk 的等待，超时抛 `LlmFailure(TIMEOUT)`。Claude 的 `ping` 事件解码成 `StreamChunk.Heartbeat`，`AgentLoop` 收到后跳过、不触发 preview，但会重置看门狗；`NetworkSetting.streamIdleTimeoutEnabled`（默认 true）控制整条看门狗，关掉后在 `ChatRequestFactory.createAgent` 传 null。
 - 理由：Anthropic 长思考时可能长时间没有内容 chunk，只有 ping；只按内容 chunk 计时会把正常请求切断。自动重试下线期间超时直接出错误卡片，不重试。
-- 合并注意：`streamIdleTimeout <= 0` 仍会立即超时，调用方只传正数或 null；非流式请求不经过看门狗。新增 provider 若有自己的保活事件，按同样方式产出 `StreamChunk.Heartbeat`，不要在 `AgentLoop` 里按 provider 特判。设置入口在网络偏好页（`setting_page_preferences_network_stream_idle_timeout`），四种语言同步；关掉后 `ChatRequestFactory` 传 null，`AgentRequest.DEFAULT_STREAM_IDLE_TIMEOUT` 是 90 秒的唯一来源。
+- 合并注意：`streamIdleTimeout <= 0` 仍会立即超时，调用方只传正数或 null；非流式请求不经过看门狗。新增 provider 若有自己的保活事件，按同样方式产出 `StreamChunk.Heartbeat`，不要在 `AgentLoop` 里按 provider 特判。设置入口在网络偏好页（`setting_page_preferences_network_stream_idle_timeout`），四种语言同步；关掉后 `ChatRequestFactory` 传 null。代码里 90 秒的唯一来源是 `AgentRequest.DEFAULT_STREAM_IDLE_TIMEOUT`，四份 locale 文案仍写死 90 秒，改常量时要一起改。
 - 测试：`AgentLoopTest` 覆盖空闲超时、chunk 重置、心跳重置与心跳不触发 preview；`ClaudeStreamDecoderTest` 覆盖 ping 解码成 `StreamChunk.Heartbeat`；`SettingsTimeoutsTest` 覆盖看门狗开关与工具超时的映射；`AgentSettingTest` 覆盖 `NetworkSetting.streamIdleTimeoutEnabled` 的旧 JSON 默认值；`:ai:testDebugUnitTest` 通过。
 
 ### C63 上下文超限自动缩窗

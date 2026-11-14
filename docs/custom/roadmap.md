@@ -406,7 +406,7 @@ RikkaHub 现状：
 
 修复顺序：
 
-P1 分批：P1a 截断 SSE 与停止结算，P1b 审批分支与配置快照，P1c idle watchdog、稳定错误码重试、overflow 兜底。
+P1 分批：P1a 截断 SSE 与停止结算，P1b 审批分支与配置快照，P1c idle watchdog 与稳定错误码重试（overflow 兜底原先列在 P1c，已随 C63 撤销）。
 
 1. P0 失败 attempt 隔离已由 C58 完成；多步工具调用的 per-step 细化仍留 P2，工具恢复结果已由 C65 处理。
 2. P1a 截断 SSE 与停止结算已由 C59 完成；P1b 审批分支与配置快照已由 C60 完成。

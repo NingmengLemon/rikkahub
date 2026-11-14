@@ -44,6 +44,19 @@ class AgentSettingTest {
     }
 
     @Test
+    fun `tool timeout snaps to whole minutes and shell times to the page bounds`() {
+        val normalized = AgentSetting(
+            toolTimeoutSeconds = 45,
+            shellDefaultTimeoutSeconds = 2,
+            shellMaxTimeoutSeconds = 30,
+        ).normalized()
+
+        assertEquals(AgentSetting.TOOL_TIMEOUT_STEP_SECONDS, normalized.toolTimeoutSeconds)
+        assertEquals(AgentSetting.MIN_SHELL_TIMEOUT_SECONDS, normalized.shellMaxTimeoutSeconds)
+        assertEquals(AgentSetting.MIN_SHELL_DEFAULT_TIMEOUT_SECONDS, normalized.shellDefaultTimeoutSeconds)
+    }
+
+    @Test
     fun `stream idle watchdog is enabled for old network settings`() {
         val decoded = JsonInstant.decodeFromString<NetworkSetting>("""{}""")
 

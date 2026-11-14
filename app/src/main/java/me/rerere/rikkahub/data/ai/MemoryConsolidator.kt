@@ -211,6 +211,7 @@ class MemoryConsolidator(
                 stream = false,
                 maxSteps = MAX_STEPS,
                 retry = settings.retryPolicy(),
+                toolTimeout = settings.toolExecutionTimeout(),
             ),
             hooks = hooks,
         ).filterIsInstance<AgentEvent.Finished>().single()

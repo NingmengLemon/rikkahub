@@ -79,16 +79,27 @@ class ChatErrorStoreTest {
     }
 
     @Test
+    fun `unknown solutions decode as no solution`() = runBlocking {
+        directory.mkdirs()
+        file.writeText(
+            """
+            [{"id":"${Uuid.random()}","errorMessage":"boom","conversationId":"${Uuid.random()}","timestamp":1,"solution":"FutureSolution"}]
+            """.trimIndent()
+        )
+
+        assertNull(store().load().single().solution)
+    }
+
+    @Test
     fun `old files with removed retry fields still load`() = runBlocking {
         directory.mkdirs()
         file.writeText(
             """
-            [{"id":"${Uuid.random()}","errorMessage":"boom","conversationId":"${Uuid.random()}","timestamp":1,"solution":"FutureSolution","retryable":true,"retryMessageId":"${Uuid.random()}"}]
+            [{"id":"${Uuid.random()}","errorMessage":"boom","conversationId":"${Uuid.random()}","timestamp":1,"retryable":true,"retryMessageId":"${Uuid.random()}"}]
             """.trimIndent()
         )
 
-        val loaded = store().load().single()
-        assertNull(loaded.solution)
+        assertEquals("boom", store().load().single().error.message)
     }
 
     @Test

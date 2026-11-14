@@ -164,16 +164,6 @@ C75 给 `NetworkSetting` 增加 `maxRetries`（默认 3）。这次只新增带�
 - v32/v31 官方样本读取与转换、同安装自家恢复、官方备份恢复、applied outcome 都通过；旧 settings JSON 没有 `maxRetries` 时按 3 解码，`SettingsRetryPolicyTest` 覆盖。
 - 官方 RikkaHub 3.1.1 手动恢复、5GB 和 `.crosscheck` 换包名恢复跳过，由请求方确认：官方 App 3.1.1 的设置入口在当前设备无法通过自动化进入（抽屉底部 Menu 只打开 Image Generation，右侧按钮是更新日志，Assistant 页只有 Back/Add，临时放大显示也未出现 Settings），而 C69 已用官方 3.1.1 恢复过同类自定义 Settings 字段，51 条已覆盖自家导出/恢复和官方样本；本次没有新增路径/附件/Room 变化，`.crosscheck` 的 C25 路径改写不受影响。设置页滑块也没有单独设备点验。
 
-## 2026-11-14 C62/C65 设置字段
-
-C62 给 `NetworkSetting` 增加 `streamIdleTimeoutEnabled`（默认 true），C65 给 `Settings` 增加 `agentSetting`（工具超时 300 秒、工作区命令默认 30 秒、最大 600 秒，都带默认值）。只新增自定义设置字段，不改 Room/schema、数据库表、附件和官方兼容出口结构；官方兼容出口照旧写整份 settings，因此 `settings.json` 会多出 `agentSetting` 与 `networkSetting.streamIdleTimeoutEnabled` 两个官方不认识的键，容忍方式与 C69、C75 相同。`OfficialSettingsCompatibilityTest` 用的是本应用的 `JsonInstant`，官方客户端对未知字段的真实容忍仍按 C18 的假设处理，本轮没有在官方客户端上重新验证。
-
-设备数据验收：
-
-- `:app:connectedGithubDebugAndroidTest` 限制在 `me.rerere.rikkahub.data.sync`，在 K60（`db238ce6`）上跑，53 条通过、0 失败（`BackupManagerTest` 26、`DatabaseBackupTest` 3、`OfficialBackupRestoreAcceptanceTest` 2、`RestoreAppliedOutcomeTest` 1、`OfficialDatabaseConverterTest` 2、`OfficialDatabaseReaderTest` 7、`OfficialDatabaseWriterTest` 4、`OfficialForeignAttachmentPathsTest` 4、`OfficialSampleAcceptanceTest` 2）。
-- JVM 侧：`SettingsFieldsTest` 覆盖 `agent_setting` 的 DataStore 往返与 key 表；`AgentSettingTest` 覆盖默认值、序列化往返、范围收口与 `NetworkSetting.streamIdleTimeoutEnabled` 的旧 JSON 默认值；`SettingsTimeoutsTest` 覆盖两个设置到 `AgentRequest` 的映射。
-- 官方 RikkaHub 3.1.1 手动恢复、5GB 与 `.crosscheck` 换包名恢复没有重跑：官方 App 3.1.1 的设置入口在当前设备仍然无法通过自动化进入（与 C75、C80 相同），本次没有新增数据库、附件或导出结构变化，53 条设备用例已覆盖自家导出/恢复与官方样本。
-
 ## 2026-11-13 C80 重跑
 
 C80 给 `usage_record` 增加 `outcome`，Room 32 到 33，并在官方兼容导出时去掉这一列。这是 Room schema 变更，按上面的标准重跑设备数据验收：
@@ -183,3 +173,13 @@ C80 给 `usage_record` 增加 `outcome`，Room 32 到 33，并在官方兼容导
 - 真实 app 库迁移后仍是 168 会话、61 个 upload 文件、476 条 usage，全部旧行 outcome 为 UNKNOWN；主库头在未 checkpoint 时仍是 32，带 WAL 读出的逻辑库是 33，Room 打开时按 WAL 处理。32 到 33 没有降级迁移；回退到 C80 前的构建前要保留迁移前的 v32 数据库副本，或继续使用新构建。
 - 官方 RikkaHub 3.1.1 手动恢复和 5GB 没有重跑；C75 时已确认官方 App 3.1.1 的设置入口在当前设备无法通过自动化进入，且本次新增列只在自定义 `usage_record` 表，官方 v32 快照和官方兼容出口的裁剪由 53 条设备用例覆盖。若要把官方 App 手工恢复也补上，需要另找时间在能进入官方设置界面的设备上执行。
 - 全量 `:app:testGithubDebugUnitTest` 791 条，7 条既有 Windows 失败未变；`:ai:testDebugUnitTest` 324 条未变；assemble、spotless、markdownlint 通过。
+
+## 2026-11-14 C62/C65 设置字段
+
+C62 给 `NetworkSetting` 增加 `streamIdleTimeoutEnabled`（默认 true），C65 给 `Settings` 增加 `agentSetting`（工具超时 300 秒、工作区命令默认 30 秒、最大 600 秒，都带默认值）。只新增自定义设置字段，不改 Room/schema、数据库表、附件和官方兼容出口结构；官方兼容出口照旧写整份 settings，因此 `settings.json` 会多出 `agentSetting` 与 `networkSetting.streamIdleTimeoutEnabled` 两个官方不认识的键，容忍方式与 C69、C75 相同。`OfficialSettingsCompatibilityTest` 用的是本应用的 `JsonInstant`，官方客户端对未知字段的真实容忍仍按 C18 的假设处理，本轮没有在官方客户端上重新验证。
+
+设备数据验收：
+
+- `:app:connectedGithubDebugAndroidTest` 限制在 `me.rerere.rikkahub.data.sync`，在设备上跑，53 条通过、0 失败。按类拆分：`BackupManagerTest` 26、`DatabaseBackupTest` 3、`OfficialBackupRestoreAcceptanceTest` 2、`RestoreAppliedOutcomeTest` 1、`OfficialDatabaseConverterTest` 2、`OfficialDatabaseReaderTest` 7、`OfficialDatabaseWriterTest` 4、`OfficialForeignAttachmentPathsTest` 4、`OfficialSampleAcceptanceTest` 2、`OfficialSchemaTrimmerTest` 2，合计 53。
+- JVM 侧：`SettingsFieldsTest` 覆盖 `agent_setting` 的 DataStore 往返与 key 表；`AgentSettingTest` 覆盖默认值、序列化往返、范围收口与 `NetworkSetting.streamIdleTimeoutEnabled` 的旧 JSON 默认值；`SettingsTimeoutsTest` 覆盖两个设置到 `AgentRequest` 的映射。
+- 官方 RikkaHub 3.1.1 手动恢复、5GB 与 `.crosscheck` 换包名恢复没有重跑：官方 App 3.1.1 的设置入口在当前设备仍然无法通过自动化进入（与 C75、C80 相同），本次没有新增数据库、附件或导出结构变化，53 条设备用例已覆盖自家导出/恢复与官方样本。

@@ -29,7 +29,6 @@ import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
 
 private const val TOOL_TIMEOUT_MIN_MINUTES = 1
-private const val MIN_SHELL_DEFAULT_SECONDS = 5
 private val TOOL_TIMEOUT_MAX_MINUTES = AgentSetting.MAX_TOOL_TIMEOUT_SECONDS / 60
 
 @Composable
@@ -37,25 +36,33 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val agent = settings.agentSetting.normalized()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val toolMinutes = (agent.toolTimeoutSeconds / 60).coerceIn(TOOL_TIMEOUT_MIN_MINUTES, TOOL_TIMEOUT_MAX_MINUTES)
+    val toolTimeoutMinutes = agent.toolTimeoutSeconds / AgentSetting.TOOL_TIMEOUT_STEP_SECONDS
+    val toolMinutes = toolTimeoutMinutes.coerceIn(TOOL_TIMEOUT_MIN_MINUTES, TOOL_TIMEOUT_MAX_MINUTES)
     val shellMaxSeconds = agent.shellMaxTimeoutSeconds
-    val shellDefaultSeconds = agent.shellDefaultTimeoutSeconds.coerceAtLeast(MIN_SHELL_DEFAULT_SECONDS)
+    val shellDefaultSeconds = agent.shellDefaultTimeoutSeconds
 
     fun updateToolTimeout(seconds: Int) = vm.updateSettings {
         it.copy(agentSetting = it.agentSetting.copy(toolTimeoutSeconds = seconds))
     }
 
     fun updateShellDefault(seconds: Int) = vm.updateSettings {
-        val max = it.agentSetting.shellMaxTimeoutSeconds.coerceAtLeast(MIN_SHELL_DEFAULT_SECONDS)
+        val max = it.agentSetting.shellMaxTimeoutSeconds
+            .coerceAtLeast(AgentSetting.MIN_SHELL_DEFAULT_TIMEOUT_SECONDS)
         it.copy(
             agentSetting = it.agentSetting.copy(
-                shellDefaultTimeoutSeconds = seconds.coerceIn(MIN_SHELL_DEFAULT_SECONDS, max),
+                shellDefaultTimeoutSeconds = seconds.coerceIn(
+                    AgentSetting.MIN_SHELL_DEFAULT_TIMEOUT_SECONDS,
+                    max,
+                ),
             ),
         )
     }
 
     fun updateShellMax(seconds: Int) = vm.updateSettings {
-        val max = seconds.coerceIn(60, AgentSetting.MAX_SHELL_TIMEOUT_SECONDS)
+        val max = seconds.coerceIn(
+            AgentSetting.MIN_SHELL_TIMEOUT_SECONDS,
+            AgentSetting.MAX_SHELL_TIMEOUT_SECONDS,
+        )
         it.copy(
             agentSetting = it.agentSetting.copy(
                 shellMaxTimeoutSeconds = max,
@@ -112,7 +119,7 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
                                     val minutes = value.roundToInt()
                                         .coerceIn(TOOL_TIMEOUT_MIN_MINUTES, TOOL_TIMEOUT_MAX_MINUTES)
                                     if (minutes * 60 != agent.toolTimeoutSeconds) {
-                                        updateToolTimeout(minutes * 60)
+                                        updateToolTimeout(minutes * AgentSetting.TOOL_TIMEOUT_STEP_SECONDS)
                                     }
                                 },
                                 valueRange = TOOL_TIMEOUT_MIN_MINUTES.toFloat()..TOOL_TIMEOUT_MAX_MINUTES.toFloat(),
@@ -149,7 +156,7 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
                                     updateShellDefault(seconds)
                                 }
                             },
-                            valueRange = MIN_SHELL_DEFAULT_SECONDS.toFloat()..shellMaxSeconds.toFloat(),
+                            valueRange = AgentSetting.MIN_SHELL_DEFAULT_TIMEOUT_SECONDS.toFloat()..shellMaxSeconds.toFloat(),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -174,7 +181,7 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
                                     updateShellMax(seconds)
                                 }
                             },
-                            valueRange = 60f..AgentSetting.MAX_SHELL_TIMEOUT_SECONDS.toFloat(),
+                            valueRange = AgentSetting.MIN_SHELL_TIMEOUT_SECONDS.toFloat()..AgentSetting.MAX_SHELL_TIMEOUT_SECONDS.toFloat(),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
