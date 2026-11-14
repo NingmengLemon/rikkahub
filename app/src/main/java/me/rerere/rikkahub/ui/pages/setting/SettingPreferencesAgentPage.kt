@@ -40,6 +40,10 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
     val toolMinutes = toolTimeoutMinutes.coerceIn(TOOL_TIMEOUT_MIN_MINUTES, TOOL_TIMEOUT_MAX_MINUTES)
     val shellMaxSeconds = agent.shellMaxTimeoutSeconds
     val shellDefaultSeconds = agent.shellDefaultTimeoutSeconds
+    val shellDefaultRange =
+        AgentSetting.MIN_SHELL_DEFAULT_TIMEOUT_SECONDS.toFloat()..shellMaxSeconds.toFloat()
+    val shellMaxRange =
+        AgentSetting.MIN_SHELL_TIMEOUT_SECONDS.toFloat()..AgentSetting.MAX_SHELL_TIMEOUT_SECONDS.toFloat()
 
     fun updateToolTimeout(seconds: Int) = vm.updateSettings {
         it.copy(agentSetting = it.agentSetting.copy(toolTimeoutSeconds = seconds))
@@ -118,7 +122,7 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
                                 onValueChange = { value ->
                                     val minutes = value.roundToInt()
                                         .coerceIn(TOOL_TIMEOUT_MIN_MINUTES, TOOL_TIMEOUT_MAX_MINUTES)
-                                    if (minutes * 60 != agent.toolTimeoutSeconds) {
+                                    if (minutes * AgentSetting.TOOL_TIMEOUT_STEP_SECONDS != agent.toolTimeoutSeconds) {
                                         updateToolTimeout(minutes * AgentSetting.TOOL_TIMEOUT_STEP_SECONDS)
                                     }
                                 },
@@ -156,7 +160,7 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
                                     updateShellDefault(seconds)
                                 }
                             },
-                            valueRange = AgentSetting.MIN_SHELL_DEFAULT_TIMEOUT_SECONDS.toFloat()..shellMaxSeconds.toFloat(),
+                            valueRange = shellDefaultRange,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -181,7 +185,7 @@ fun SettingPreferencesAgentPage(vm: SettingVM = koinViewModel()) {
                                     updateShellMax(seconds)
                                 }
                             },
-                            valueRange = AgentSetting.MIN_SHELL_TIMEOUT_SECONDS.toFloat()..AgentSetting.MAX_SHELL_TIMEOUT_SECONDS.toFloat(),
+                            valueRange = shellMaxRange,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
