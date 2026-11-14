@@ -69,10 +69,10 @@
 | C59 | 截断流识别与停止结算 | 改造 |
 | C60 | 审批期间冻结 turn 上下文 | 改造 |
 | C61 | 结构化失败与重试策略 | 改造 |
-| C62 | 流式 idle watchdog | 改造 |
-| C63 | 上下文超限自动缩窗 | 改造 |
+| C62 | 流式 idle watchdog（心跳与开关） | 改造 |
+| C63 | 上下文超限自动缩窗 | 撤销 |
 | C64 | 移除设置页关于区域的社区与文档入口 | 移除 |
-| C65 | 工具中断恢复结果 | 改造 |
+| C65 | 工具中断恢复结果与超时设置 | 改造 |
 | C66 | 消息队列恢复与回插 | 改造 |
 | C67 | 进程死亡回复恢复 | 改造 |
 | C68 | 压缩孤儿对加载清理与过滤 | 改造 |
@@ -80,11 +80,11 @@
 | C70 | 消息队列持久化 | 新增 |
 | C71 | 错误卡片持久化 | 新增 |
 | C72 | 上下文压缩按 token 预算 | 新增 |
-| C73 | 发送前上下文裁剪 | 新增 |
+| C73 | 发送前上下文裁剪 | 撤销 |
 | C74 | 上下文水位与压缩建议 | 新增 |
-| C75 | 自动重试次数可调 | 新增 |
-| C76 | 重试 attempt 可见化 | 新增 |
-| C77 | 错误卡片重试本步 | 新增 |
+| C75 | 自动重试次数可调 | 下线 |
+| C76 | 重试 attempt 可见化 | 下线 |
+| C77 | 错误卡片重试本步 | 撤销 |
 | C78 | 工具失败日志分级 | 改造 |
 | C79 | 本地导出默认包含工作区文件 | 改造 |
 | C80 | 用量成功失败区分与官方 schema 裁剪 | 新增 |
@@ -490,23 +490,23 @@
 
 - 落点：`ErrorParser.kt` 新增 `LlmFailureCode`、`LlmFailure`，`HttpException` 带上 code、HTTP status 和 `Retry-After`；`toHttpException`、`withResponse` 负责从响应归一化。五个聊天 provider 接线点（Claude、ChatCompletions、Responses、Google generateContent、Interactions）的非流式非 2xx 改抛 `HttpException`，流式 `onFailure` 的解析错误附加响应状态，空响应体也保留状态。`RetryPolicy` 改为按错误码允许列表重试，支持 `maxDelay`、10% jitter 和 `Retry-After`；`AgentLoop` 在流式和非流式路径把空回复包成 `EMPTY_RESPONSE`，进入同一重试循环。
 - 理由：原来只按 `IOException` 判断，HTTP 429/5xx 的 JSON 错误大多不重试；空回复直接以完成状态落库；重试固定 1s/2s/4s，没有 jitter，也不看服务端 `Retry-After`。
-- 合并注意：默认只重试 `RATE_LIMIT`、`SERVER`、`TIMEOUT`、`TRANSPORT`、`EMPTY_RESPONSE`；`AUTH`、`QUOTA`、`INVALID_REQUEST`、`CONTEXT_WINDOW_EXCEEDED` 不重试。C75 起 `NetworkSetting.maxRetries` 控制重试次数，默认 3，范围 0 到 10；0 表示开关仍开但不重试，开关关掉时恒为 `RetryPolicy.NONE`。`RetryPolicy` 的 `retryOn` 仍是可选的逃生口，自定义策略优先于码表。`Retry-After` 会被 `maxDelay` 截断，不做“服务端要求超过上限就放弃”的区分；jitter 固定 10%，测试用 `jitterRatio = 0`。空回复判定只把空白 Text/Reasoning 当空，Tool、图片、文档等 part 都算有内容；这会让某些本来静默成功的空回复变成重试后错误，是预期行为。结构化错误优先于 HTTP status，`insufficient_quota` 和嵌套 `QuotaFailure` 即使是 429 也归 `QUOTA` 且不重试；没有 `QuotaFailure` 的 Google `RESOURCE_EXHAUSTED` 429 仍是 `RATE_LIMIT`，可重试。非 JSON body 只按 HTTP status 分类，不拿 HTML 里的关键词做信号。流式 onFailure 解析失败时用响应状态兜底，不再把 HTML 502 当序列化异常。`ai/build.gradle.kts` 打开 `unitTests.isReturnDefaultValues` 只是为了 provider 接线测试能调用 `Log`，范围仅限 `ai` 单测。C3 的 `ai/` 小改动原则下，这是第八处分叉。
+- 合并注意：默认只重试 `RATE_LIMIT`、`SERVER`、`TIMEOUT`、`TRANSPORT`、`EMPTY_RESPONSE`；`AUTH`、`QUOTA`、`INVALID_REQUEST`、`CONTEXT_WINDOW_EXCEEDED` 不重试。C75 的 `NetworkSetting.maxRetries` 与开关已随重试整体下线，`Settings.retryPolicy()` 恒为 `RetryPolicy.NONE`，字段保留。`RetryPolicy` 的 `retryOn` 仍是可选的逃生口，自定义策略优先于码表。`Retry-After` 会被 `maxDelay` 截断，不做“服务端要求超过上限就放弃”的区分；jitter 固定 10%，测试用 `jitterRatio = 0`。空回复判定只把空白 Text/Reasoning 当空，Tool、图片、文档等 part 都算有内容；这会让某些本来静默成功的空回复变成重试后错误，是预期行为。结构化错误优先于 HTTP status，`insufficient_quota` 和嵌套 `QuotaFailure` 即使是 429 也归 `QUOTA` 且不重试；没有 `QuotaFailure` 的 Google `RESOURCE_EXHAUSTED` 429 仍是 `RATE_LIMIT`，可重试。非 JSON body 只按 HTTP status 分类，不拿 HTML 里的关键词做信号。流式 onFailure 解析失败时用响应状态兜底，不再把 HTML 502 当序列化异常。`ai/build.gradle.kts` 打开 `unitTests.isReturnDefaultValues` 只是为了 provider 接线测试能调用 `Log`，范围仅限 `ai` 单测。C3 的 `ai/` 小改动原则下，这是第八处分叉。
 - 手动验收：用假 provider 或代理返回 429 带 `Retry-After`、5xx 带 JSON/HTML、401、402、400 context、空回复，确认重试次数和间隔符合码表；退避等待中停止生成应立即结束；重试后工具副作用不重复。
 - 测试：`RetryTest` 覆盖码表、`Retry-After` 原值和超过 `maxDelay` 的截断、jitter 归零后的固定间隔、`QUOTA` 不重试和取消；`ErrorParserTest` 覆盖 401/402/429/5xx/400 context 分类、结构化 `insufficient_quota`、嵌套 `QuotaFailure`、Gemini `RESOURCE_EXHAUSTED` 429 仍可重试、`withResponse` 保留结构化 code、HTTP date、非 JSON body 只按 status 分类和 `Retry-After` 解析；`AgentLoopTest` 覆盖流式和非流式空回复重试后成功；`ChatCompletionsErrorTest` 用假 interceptor 验证 429 `insufficient_quota` 到 `HttpException(status/code/Retry-After)` 的接线；`:ai:testDebugUnitTest` 全量通过；`:app:assembleGithubDebug` 通过。`:app:testGithubDebugUnitTest` 仍为已知 Windows 7 失败，本轮没有改 app。
 
 ### C62 流式 idle watchdog
 
-- 落点：`AgentRequest.streamIdleTimeout` 默认 90 秒，可置空关闭；`AgentLoop.stream` 用 `Flow.timeout` 限制相邻 chunk 的等待，超时抛 `LlmFailure(TIMEOUT)`，启用重试策略时进入 C61 的重试循环。正常用户停止是 `JobCancellationException`，进不了这个窄 catch；catch 里的 `ensureActive()` 只兜“超时与取消同时发生”的竞态。
-- 理由：原来只有 OkHttp/Ktor 的读超时，SSE 心跳会不断重置它；代理保持连接但不发内容时可以卡很久，界面一直显示生成中。watchdog 只看流内 chunk 间隔，不覆盖非流式请求、工具执行、上下文压缩和翻译的独立 streamText 路径。
-- 合并注意：默认值写在 `AgentRequest`，当前没有设置页入口；要可配置时从 `ChatRequestFactory.createAgent` 注入。`Flow.timeout` 只在上游没有新 chunk 时触发，收到任意 chunk 会重置；超时后上游被取消，重试从本步起点重放，因此不会有半截内容进入下一轮。非流式仍依赖网络层读超时。`streamIdleTimeout <= 0` 目前会立即超时并耗尽重试，调用方应只传正数。`ai/` 分叉计数因此变为九处。
-- 测试：`AgentLoopTest` 覆盖“流挂起超过 1 秒后超时并重试成功”和“相邻 chunk 都在超时内但总时长超过超时仍完成”；`:ai:testDebugUnitTest` 全量通过。手动验收：代理保持 SSE 连接但不发事件，约 90 秒后错误卡片/重试；等待中停止生成应立即结束，不额外重试。
+- 落点：`AgentRequest.streamIdleTimeout` 默认 90 秒；`AgentLoop.stream` 用 `Flow.timeout` 限制相邻 chunk 的等待，超时抛 `LlmFailure(TIMEOUT)`。Claude 的 `ping` 事件解码成 `StreamChunk.Heartbeat`，`AgentLoop` 收到后跳过、不触发 preview，但会重置看门狗；`NetworkSetting.streamIdleTimeoutEnabled`（默认 true）控制整条看门狗，关掉后在 `ChatRequestFactory.createAgent` 传 null。
+- 理由：Anthropic 长思考时可能长时间没有内容 chunk，只有 ping；只按内容 chunk 计时会把正常请求切断。自动重试下线期间超时直接出错误卡片，不重试。
+- 合并注意：`streamIdleTimeout <= 0` 仍会立即超时，调用方只传正数或 null；非流式请求不经过看门狗。新增 provider 若有自己的保活事件，按同样方式产出 `StreamChunk.Heartbeat`，不要在 `AgentLoop` 里按 provider 特判。
+- 测试：`AgentLoopTest` 覆盖空闲超时、chunk 重置、心跳重置与心跳不改变消息；`:ai:testDebugUnitTest` 通过。
 
 ### C63 上下文超限自动缩窗
 
-- 落点：`AgentHooks.onContextOverflow()` 返回 true 表示调用方已缩小下一 step 的上下文；`AgentLoop` 捕获 `LlmFailure(CONTEXT_WINDOW_EXCEEDED)` 后只调用一次 hook，成功则用 `retryingStep` 跳过完成判定，从本 step 起点重试，不再让 C61 的重试码表处理。`ChatRequestFactory` 的 hook 只记 `shrinkActive`；每次 `prepareStep` 先用当前可见消息过 `limitContext`，再用 `overflowWindow` 取最后一条 user 起、至少两条且比当前窗口小的窗口。`buildStep` 每步重新计算，不会把旧的 assistant 快照带进重试后的下一步。`AgentLoop` 复用失败尝试的 base，避免 preview 已经写出的消息 id 被换掉。
-- 理由：C61 已能把 provider 的 context overflow 归一化，但之前直接进错误卡片；用户只能手动压缩。自动缩窗不需要额外摘要请求，失败时只牺牲旧历史，保留最后几轮。
-- 合并注意：只缩一次，不做自动压缩；窗口先受 `contextMessageLimit` 约束，再取最后一条 user 起、至少两条的子窗口，仍可能因单条超大输入失败。按消息条数裁剪，不算 token；非 user 的前导消息会被丢弃，压缩检查点也可能被这个 fallback 跳过。窗口之后还会 `mergeAdjacentUserMessages`，相邻 user 合并后实际条数可能少于两条，但首条仍然是 user。hook 状态属于本次 `createAgent` 的 hooks 实例，后续工具 step 每步按当前消息重算。缩窗只改变发给模型的历史，不改会话里已有的消息和分支。C61 的 `CONTEXT_WINDOW_EXCEEDED` 分类是前置条件；非流式和流式都经过 AgentLoop，所以都覆盖。`ai/` 分叉计数因此变为十处。
-- 测试：`AgentLoopTest` 用抛 `CONTEXT_WINDOW_EXCEEDED` 的假流验证首轮、工具 step 后、连续两次、以及 preview 后重试的消息 id 复用；`ChatRequestFactoryContextTest` 覆盖 configured 窗口子集、最后 user 起始、至少两条、fallback 到上一条 user、以及当前消息刷新的边界；`:ai:testDebugUnitTest`、`:app:testGithubDebugUnitTest` 对应测试通过。手动验收：有足够旧历史时，用超长历史触发 provider 400 context，确认窗口缩到最后 user 后重试成功；重试后如果模型再发起工具调用，下一步请求必须包含新的 tool call 和工具结果，且工具只执行一次；只有一两条可见消息或单条超大输入仍失败并出卡片，不无限缩。
+- 现状：已撤销（2026-11-14）。`AgentHooks.onContextOverflow`、`overflowWindow`、`shrinkActive`、`contextOverflowRetried` 与相关测试都已删除；provider 返回上下文超限时只按 `CONTEXT_WINDOW_EXCEEDED` 出错误卡片，由用户自己压缩或截断，不再静默改请求。
+- 理由：原实现把请求缩到最后一条 user 起，等于把整段历史从这一次请求里丢掉，而且每一轮都会重演，界面没有任何提示；这条又是在 DSH 审计里按重型 harness 的场景补的，和聊天客户端的定位不符。
+- 合并注意：上游若在 `AgentHooks` 或 `AgentLoop` 里增加类似的 overflow 恢复入口，不要直接搬回来；是否恢复、以什么形式恢复，等失败恢复与消息模型重做时一起定，见 `roadmap.md` 的「失败恢复与上下文的返工」。
+- 测试：`ChatRequestFactoryContextTest` 已删除，`AgentLoopTest` 的 4 条 overflow 用例已删除；`:ai:testDebugUnitTest` 通过。
 
 ### C64 移除设置页关于区域的社区与文档入口
 
@@ -517,10 +517,10 @@
 
 ### C65 工具中断恢复结果
 
-- 落点：`ConversationMessages.kt` 的 `recoverInterruptedTool` 按 `startedAt` 区分 `not_started` 与 `outcome_unknown`，`startedAt` 为空写未开始，有开始时间写结果未知；`cancelInterruptedTools` 和 `Conversation.withoutUnresumableToolCalls` 共用它。`withoutUnresumableToolCalls` 删除了整条消息的逻辑：消息里有可恢复工具（Approved/Denied/Answered）时整条不动，避免把同批 Auto 工具提前写成恢复结果；没有可恢复工具时才逐 part 替换不可恢复 Tool part，保留文本、推理和其它 part。`AgentRequest.toolTimeout` 默认 5 分钟，`AgentLoop.runTool` 用 `withTimeoutOrNull` 执行工具，超时返回模型可读的 `Tool execution timed out after Ns`；工具内部自己的 `TimeoutCancellationException` 先 `ensureActive()` 再转成工具错误，不会取消整轮。错误结果只给模型一行“Tool execution failed: ...”，堆栈只进日志（C78 起 `Log.e`），模型结果只有摘要。
-- 理由：原来所有中断都写成 `cancelled by user`，分不清工具是否已经产生副作用；`withoutUnresumableToolCalls` 命中时会丢掉整条消息的文本和已执行结果；工具错误把内部堆栈发给模型，既浪费 token 也泄露实现细节。`workspace_shell` 自身允许 600 秒，而默认工具超时是 300 秒；用 shell 长任务时需要显式调大 `toolTimeout`，否则 300 秒会被中止并丢弃输出。
-- 合并注意：恢复结果仍然写进 `output`，所以 `isExecuted=true`、`isPending=false`，Pending 审批不会再显示；这是“本轮停止/放弃审批”的语义，不是用户点了拒绝。没有恢复 `ApprovalState`，如果后续要做“重新审批”需要另设状态。旧消息没有 `startedAt` 一律按 `not_started`，可能把实际执行过的旧工具写成未开始；进程死亡后才恢复的 `outcome_unknown` 不把恢复时刻当结束时间，`finishedAt` 沿用 `startedAt`。工具超时默认 5 分钟，可在 `AgentRequest` 覆盖或置空关闭；`withTimeoutOrNull` 是协作式取消，不挂起且不走 `runInterruptible` 的阻塞工具不会被按时打断；`toolTimeout <= 0` 会立即超时。C78 已把工具错误堆栈改成 `Log.e`；output 的 NonCancellable 写入仍受 FlowCollector 跨协程发射限制，未做，仍是 roadmap P2 的剩余项。`ai/` 的分叉清单见 `roadmap.md` 的模块参考表。
-- 测试：`ConversationToolCallsTest` 覆盖不可恢复工具保留消息、startedAt 区分两种状态、文本/推理保留、只有工具调用的节点不删除、同消息里 resumable 工具不会误伤 Auto 兄弟、Pending+Auto 一起恢复；`ConversationMessagesTest` 覆盖停止的 `not_started` 和 `outcome_unknown`；`AgentLoopTest` 覆盖工具失败只给模型摘要、否定断言确认不含类名/堆栈、工具执行超时后继续下一轮（断言 after 1s、startedAt/finishedAt 和下一轮请求包含结果）、工具内部超时不取消整轮，以及默认 5 分钟下用户停止仍向上传播；`:app:testGithubDebugUnitTest`、`:ai:testDebugUnitTest` 对应测试通过。手动验收：停止在工具未开始/执行中两种时机，输出状态分别为 `not_started`/`outcome_unknown`；待审批工具被放弃后不会继续显示审批按钮；工具抛错时模型只看到摘要。
+- 落点：`ConversationMessages.kt` 的 `recoverInterruptedTool` 按 `startedAt` 区分 `not_started` 与 `outcome_unknown`，`cancelInterruptedTools` 和 `Conversation.withoutUnresumableToolCalls` 共用它，逐 part 替换不可恢复的 Tool part，保留文本与推理。`Tool` 增加 `timeoutMillis` 声明；`AgentRequest.toolTimeout` 与工具有效超时取两者的较大值（`effectiveToolTimeout`），外层不能先于工具自身的超时触发。`AgentSetting.toolTimeoutSeconds`（默认 300，0 表示不限制）控制外层超时；`workspace_shell` 的默认与最大命令超时来自 `AgentSetting.shellDefaultTimeoutSeconds`（默认 30）与 `shellMaxTimeoutSeconds`（默认 600），并据此声明 `timeoutMillis`。
+- 理由：原来所有中断都写成 `cancelled by user`，分不清工具是否已经产生副作用；工具错误把内部堆栈发给模型。超时固定 5 分钟又和 `workspace_shell` 自己允许的 600 秒冲突，模型要 600 秒会被外层先掐掉。
+- 合并注意：`timeoutMillis` 是工具声明，不是执行参数；外层设为不限制时整条外层超时关闭，工具内部超时保持各自逻辑。`withTimeoutOrNull` 是协作式取消，不挂起且不走 `runInterruptible` 的阻塞工具不会被按时打断。旧的 `toolTimeout <= 0` 立即超时的行为不再通过设置暴露，设置里 0 表示关闭。
+- 测试：`AgentLoopTest` 覆盖工具失败摘要、内部超时、外层超时、声明超时优先于较短外层超时，以及 `effectiveToolTimeout` 的合并规则；`AgentSettingTest` 覆盖默认值与往返。
 
 ### C66 消息队列恢复与回插
 
@@ -569,43 +569,43 @@
 
 - 落点：`CompressionPlan` 的保留起点按 user 轮次对齐：`keepRecent` 落在 assistant/tool 消息上时向前找到产生它的 user，保留段只会变大，不会把唯一 user 压进摘要；范围为空时返回 `NothingToCompress`，找不到 user 时保留原起点（产生它的 user 已在窗口外）。新增本地估算 `estimateTokens`（CJK 按 1 token、其它非空白按 4 字符/token，图片/视频 1024，工具按内容，文档按固定 4096 加文件名），`compressionSummaryMaxTokens` 按模型 `contextLength` 的八分之一夹在 1024 到 4096，并尊重 assistant 的 `maxTokens`；`compressionInputBudget` 再预留 2048 给系统提示词、工具和格式开销。`planCompression` 增加 `maxInputTokens` 与 `contextMessageLimit`，预算从最后一个检查点（含）到 `endIndex`，按 `filterModelVisible` 和 `limitContext` 与摘要请求对齐，检查点之前的旧历史不计入；超过预算返回 `RangeTooLarge`，`runCompressionTurn` 提示先截断或多保留，不再把必然溢出的摘要请求发给 provider。`streamCompressionSummary` 用显式 `maxTokens` 替代原来的 `null`；finish reason 被截断时不再整次失败，改用已经拿到的部分摘要并弹非持久化通知。新增中英日繁中四条 `chat_page_compress_range_too_large`，并把 `chat_page_compress_truncated` 改成“已使用部分摘要”。
 - 理由：原来的压缩只按条数决定保留，`keepRecent=1` 且末条是 assistant 时会把产生它的 user 压掉；摘要请求的 `maxTokens = null` 由 provider 默认值决定，输出一截断就整次失败；旧历史超过模型上下文时又会直接把摘要请求发出去。按 user 轮次对齐、给摘要输出和输入都设预算、截断退回部分摘要，能让压缩在真实长会话里可预期。
-- 合并注意：不改 Room、Settings、官方兼容导出或 `ai/`；估算是保守近似，不是 provider tokenizer，`compressionInputBudget` 的 2048 预留也不精确覆盖所有系统提示词/工具/记忆；文档只按固定 4096 估算、不解析文件内容，大 PDF/OCR/提示词注入文本仍可能低估；C73 已在请求装配时裁剪旧 tool result 和图片；超大历史会被拒绝而不是分块摘要；部分摘要可能漏掉细节，但会明确提示；`keepRecent` 的 UI 含义仍是至少保留条数，实际会因 user 对齐多保留；摘要预算会受 assistant `maxTokens` 限制；4096 的默认上限是为了避免超过小输出模型的服务端上限，仍可能在更小的模型上失败；没有新增设置字段，不需要数据层验收。`chat_page_compress_truncated` 的含义从“历史未截断”变成“使用部分摘要”，四种语言同步。
+- 合并注意：不改 Room、Settings、官方兼容导出或 `ai/`；估算是保守近似，不是 provider tokenizer，`compressionInputBudget` 的 2048 预留也不精确覆盖所有系统提示词/工具/记忆；文档只按固定 4096 估算、不解析文件内容，大 PDF/OCR/提示词注入文本仍可能低估；C73 已撤销，请求装配不再做额外的消息改写；超大历史会被拒绝而不是分块摘要；部分摘要可能漏掉细节，但会明确提示；`keepRecent` 的 UI 含义仍是至少保留条数，实际会因 user 对齐多保留；摘要预算会受 assistant `maxTokens` 限制；4096 的默认上限是为了避免超过小输出模型的服务端上限，仍可能在更小的模型上失败；没有新增设置字段，不需要数据层验收。`chat_page_compress_truncated` 的含义从“历史未截断”变成“使用部分摘要”，四种语言同步。
 - 测试：`CompressionPlanTest` 覆盖保留起点对齐 user、单轮不压、找不到 user、超预算拒绝、预算内通过、检查点前旧历史不计入、`keepRecent=0` 带检查点、摘要 token 上限、assistant 上限为 0、输入预算、CJK/ASCII 与 Document 估算；全量 `:app:testGithubDebugUnitTest` 752 条（C72 当时计数），7 条既有 Windows 失败未变；assemble、spotless、markdownlint 通过。计划/预算纯函数由 JVM 覆盖；`ChatService` 的截断→部分摘要分支和 `RangeTooLarge` 通知没有服务层测试；provider key 无效，也没有真实摘要样本。
 
 ### C73 发送前上下文裁剪
 
-- 落点：新增 `pruneContextForRequest`，在 `ChatRequestFactory.buildStep` 的 `limitContext` 与 C63 overflow window 之后、输入变换之前，对这次请求的消息副本做预算裁剪。预算为 `(model.contextLength - 2048).coerceAtLeast(1024)`，`contextLength <= 0` 时原样返回；最近 6 条不动。先找最近 6 条之外的工具输出：只有截断后确实变短，或 output 里含图片等非文本 part 时才重写，重写成「前缀 + 前 2000 字符」加非文本占位；再把同一范围内的消息级旧图片换成占位文本。每裁一条就重新估算，降到预算内就停；裁完仍超预算时不再继续处理，裁剪结果照发，交给 C63 overflow 恢复或 provider 错误。压缩摘要也走 `buildStep`，同样使用这层裁剪。
-- 理由：C72 只修了压缩计划本身，正常发送时旧 tool result 和图片仍会全部进入请求；模型上下文较小时，长工具输出和历史图片会先把窗口挤爆。请求级裁剪能保住最近上下文，又不必改存储或增加设置。
-- 合并注意：不改 Room、Settings、官方兼容导出或 `ai/`；只裁最近 6 条之外的工具输出和旧图片，最近工具链、用户刚发的图片、没有 output 的未执行/待审批工具不裁；工具输出保留前 2000 字符，消息级和工具输出内的图片都换成纯文本占位，模型会丢失部分细节，这是空间换信息；1025 到 2000 字符的输出不会为了加前缀而重写；预算依赖用户填写的模型 `contextLength`，默认 1M 时基本不会触发；2048 预留不精确覆盖系统提示词和工具定义；如果最近 6 条自己就超预算、或裁完仍超，不再继续处理，C63 和 provider 错误仍是兜底；Document 不参与裁剪，`DocumentAsPromptTransformer` 在裁剪之后还会把全文展开，超大文档仍可能把预算顶破；C72 的计划估算不调用这层裁剪，压缩的 `RangeTooLarge` 可能偏保守；没有新增设置字段，不需要数据层验收。
-- 测试：`ContextPruningTest` 覆盖预算内原样返回、旧工具输出截断且保留最近消息与原列表、两条可裁工具时只裁第一条（early stop）、1025 到 2000 字符不重写、旧图片占位且保留最近图片、工具输出内图片占位并计数、待审批无 output 工具不裁、恰好 6 条不裁、`contextLength <= 0` 原样返回、无工具/图片时原样返回；全量 `:app:testGithubDebugUnitTest` 762 条，7 条既有 Windows 失败未变；assemble、spotless、markdownlint 通过。没有设备验证：默认 1M 上下文很难触发，阈值靠 JVM 用例覆盖。
+- 现状：已撤销（2026-11-14）。`ContextPruning.kt`、`buildStep` 里的调用、日志与 `ContextPruningTest` 都已删除；发送前只做 `limitContext` 的条数截断，超限交给错误卡片。
+- 理由：静默改写模型输入且没有开关，改到较早的消息会破坏消息段的前缀缓存，最近几轮要整段重算；这条是从 DSH 审计借来的，真正的长期方案是压缩计划与显式压缩，不是替用户悄悄删历史。
+- 合并注意：`buildStep` 的输入变换顺序恢复成 `limitContext` 之后直接进 `transforms`；不要再在请求装配里加隐式的消息改写。`DocumentAsPromptTransformer` 仍按原样在变换阶段展开文档。
+- 测试：`ContextPruningTest` 已删除；`:app:testGithubDebugUnitTest` 全量通过。
 
 ### C74 上下文水位与压缩建议
 
 - 落点：新增 `ContextPressure`/`Conversation.contextPressure(limitTokens)`。只取当前可见窗口（`filterModelVisible().withoutCompressionScratch()`，从最后一个检查点起），窗口内最近一次真实 usage 必须晚于检查点的 `createdAt`，再加它之后消息的本地估算；没有可用 usage 时整窗估算；检查点之前的旧 usage 和保留段里创建更早的旧回复都不采用。比例达到 80% 时 `shouldSuggestCompression` 为真。`ChatPage` 底部栏在非预览、非生成/压缩时显示 `ContextPressureBanner`：百分比、used/limit、压缩按钮；按钮只打开管理上下文对话框，不自动压缩。文案加四份 locale。
-- 理由：C72/C73 解决的是压缩计划和发送前裁剪，但用户看不到上下文还剩多少；长会话要等到 provider overflow 或裁掉旧内容才有反馈。用最近一次真实 usage 加尾部估算做建议条，既比本地估算准，也不需要新增设置或自动改历史。
+- 理由：C72 解决的是压缩计划和摘要预算，但用户看不到上下文还剩多少；长会话要等到 provider overflow 才有反馈。用最近一次真实 usage 加尾部估算做建议条，既比本地估算准，也不需要新增设置或自动改历史。
 - 合并注意：不改 Room、Settings、官方兼容导出或 `ai/`；不自动压缩，不写历史，只显示建议并打开现有对话框；最近一条 usage 为 0 时跳过，找不到可用 usage 才整窗估算；旧消息没有 `lastUsage` 时 `contextTokens()` 会退回累计 `usage`，比例可能偏高；last usage 必须在最后一个检查点之后且 `createdAt` 晚于检查点，否则压缩/截断保留段的旧回复会把建议条常亮；删除或编辑更早消息不会插检查点，最后一条 usage 仍可能偏高；比例是近似值，尾部用本地估算，整窗估算不含 system prompt 和工具定义；`currentChatModel` 没有 contextLength、生成/压缩中或预览模式时不显示；banner 只在 Android 主聊天页，Web、悬浮窗和导出没有；建议条没有 dismiss 状态，压力降下来或压缩/截断后自然消失。
 - 测试：`ContextPressureTest` 覆盖真实 usage 加尾部、无 usage 回退估算、检查点前 usage 忽略、保留段创建更早的 usage 忽略、多个 usage 取最后一个、legacy 累计 usage、80% 阈值、ratio>1、失败回复与压缩 scratch 不计入、空会话、非正 contextLength；全量 `:app:testGithubDebugUnitTest` 773 条，7 条既有 Windows 失败未变；assemble、spotless、markdownlint 通过。没有设备验证：样本会话 usage 很小、模型 contextLength 默认 1M，banner 阈值只由 JVM 用例覆盖。
 
 ### C75 自动重试次数可调
 
-- 落点：`NetworkSetting.maxRetries` 默认 3，范围 `0..NetworkSetting.MAX_RETRIES`（10）。`Settings.retryPolicy()` 在开关打开时用 `RetryPolicy.NETWORK.copy(maxRetries = 设置值)`，0 表示不重试；开关关闭仍是 `RetryPolicy.NONE`。网络设置页在 Automatic retry 开关下方加 `formItem` + Slider，0 到 10，trailing 显示当前值，开关关闭时整项隐藏；四份 locale 更新描述并新增「Retry attempts」。
-- 理由：C61 的自动重试次数固定为 3，用户无法调整重试次数；把次数放回网络设置，和已有的自动重试开关放在一起。
-- 合并注意：这是 Settings 结构变更，字段带默认值，老 settings JSON 没有该字段时按 3 解码；不改 Room 和 `ai/`。次数是全局的，不按 provider/会话区分；0 只关闭重试，不关闭开关本身；Slider 拖动时直接写 SettingsStore，没有额外确认；attempt 行/倒计时 C76 已补，错误卡片重试 C77 已补，失败 usage 区分仍归 P3。官方兼容出口仍写整份 settings，因此 settings.json 会多一个官方不认识的 `networkSetting.maxRetries` 键，容忍方式和 C69 的 `confirmStopGeneration` 相同。
-- 测试：`SettingsRetryPolicyTest` 覆盖默认 3、开关关闭为 0、设置为 0、设置 5、越界钳到 10/0、旧 JSON 缺字段按 3 解码；全量 `:app:testGithubDebugUnitTest` 779 条，7 条既有 Windows 失败未变；assemble、spotless、markdownlint 通过。设备验收：`data.sync` 设备包 51 条全部通过（含 `BackupManagerTest`、`DatabaseBackupTest`、官方样本 v32/v31、官方备份恢复、applied outcome 等）；官方 RikkaHub 3.1.1 手动恢复、5GB 和 `.crosscheck` 换包名恢复跳过，原因是官方 App 3.1.1 的设置入口在当前设备无法通过自动化进入，且 C69 已用官方 3.1.1 恢复过同类自定义 Settings 字段，51 条已覆盖 settings 序列化与官方样本；跳过由请求方确认。设置页滑块没有单独设备点验。C76 已补 attempt 行和倒计时，C77 已补错误卡片重试；失败 usage 区分仍留 P3。
+- 现状：已下线（2026-11-14）。`NetworkSetting.maxRetries` 字段与已保存 JSON 保留，网络设置里的自动重试开关和次数滑块已移除，`Settings.retryPolicy()` 恒返回 `RetryPolicy.NONE`；`SettingsRetryPolicyTest` 改为断言恒为 0 与旧 JSON 默认值。
+- 理由：重试以 agent step 为单位，失败后整条重放会把已生成内容吞回去；等失败恢复与消息模型重做后再恢复入口，见 `roadmap.md` 的「失败恢复与上下文的返工」。
+- 合并注意：恢复时只需改回 `Settings.retryPolicy()` 的实现并恢复设置项，字段和序列化都不用动；`NetworkSetting.MAX_RETRIES` 保留。
+- 测试：`SettingsRetryPolicyTest` 通过。
 
 ### C76 重试 attempt 可见化
 
-- 落点：`ConversationSession.retryAttempts` 保存 `RecordedRetryAttempt`（`RetryAttempt` + 进入等待的时间），`ChatService` 收到 `AgentEvent.Retrying` 时追加，`runTurn`（含审批恢复）/`runCompressionTurn` 新一轮开始和 `replace` 时清空，最多保留 20 条。`ChatList` 把 `RetryAttemptsCard` 和错误卡片放进同一个底部浮层 Column，重试记录在错误卡片上方；卡片限高 240dp、可滚动并自动滚到最新 attempt，浮层实际高度通过 `onSizeChanged` 计入 LazyColumn 底部 contentPadding，最后一条消息可以滚到浮层上方；选择模式隐藏重试卡。标题、编号/原因、计划等待秒数；最新一条在 `retrying` 为 true 时由 `RetryCountdown` 每 250ms 刷新「N 秒后重试」，到点显示「正在重试」。`retrying` 是独立状态，不再借 `processingStatus`，避免 OCR 等步骤误点亮倒计时。成功或失败后卡片保留到下一轮，失败时和错误卡片同屏。纯函数 `retryRemainingSeconds` 和会话记录/清空有单测。
-- 理由：C61/C75 的重试状态只有一行 `Retrying (n/m)`，失败原因和等待时间在状态清掉后就看不到了；把 attempt 做成会话内存里的记录，既不落盘，也不改消息历史，用户能看到这一轮到底重试了几次、每次为什么失败、等了多久。
-- 合并注意：只在 Android 主聊天页，Web、悬浮窗和导出没有；记录只在内存，进程死亡后随 C67 的 `INTERRUPTED` 恢复消失，离开聊天页超过 idle 回收时间（约 5 秒）也会丢；新一轮发送、压缩、审批恢复或 replace 会清空，失败后保留到下一次发送；最多 20 条，列表限高滚动，正常受 C75 的 0..10 次限制；原因取 `cause.message` 前 160 字符且 UI 最多两行，可能包含 provider 的网络细节；倒计时按墙钟，应用在后台时不主动刷新，回前台后按真实时间校正；显示的是计划退避向上取整，取消等待时可能比实际等待偏大；多步工具调用每一步的 `withRetry` 从 1 重新计数，同一卡片可能出现两次 `Attempt 1/3`；C77 已补错误卡片重试，失败 attempt 的 usage 仍需 P3 的 Room 字段；不改 Room、Settings、备份或 `ai/`。
-- 测试：`RetryAttemptsTest` 覆盖倒计时向上取整/到点归零/超过截止时间、会话记录和清空、最多保留 20 条、replace 清空；全量 `:app:testGithubDebugUnitTest` 783 条，7 条既有 Windows 失败未变；assemble、spotless、markdownlint 通过。设备手动两段：无效 Claude provider 重试中看到 `Retry attempts`、`Attempt 1/3`、连接原因和 `Retrying now`；等三次重试都失败后，错误卡片 `Message generation failed` 出现在重试记录下方，两者同屏不遮挡。测试消息已清掉，fork 数据恢复为 168/61；底部留白和卡片限高滚动由代码审查/编译覆盖，未在设备上重新截失败后的滚动状态。
+- 现状：已下线（2026-11-14）。自动重试关闭后没有 `AgentEvent.Retrying` 来源，`RetryAttemptsCard` 与 `retryRemainingSeconds` 不会再出现；代码与测试保留，恢复重试时直接接线。
+- 理由：同 C75。
+- 合并注意：`ConversationSession.retryAttempts` 仍会随 `replace`/新一轮清空，不落盘；恢复重试前不要删 UI 与文案。
+- 测试：`RetryAttemptsTest` 保留并通过。
 
 ### C77 错误卡片重试本步
 
-- 落点：`ChatError` 新增 `retryable` 和 `retryMessageId`，生成兜底 `catch` 的 `addError` 传 true；`retryTargetMessageId` 在普通发送时取最后一条正常用户消息的 UIMessage id，重新生成时取目标 `MessageNode` 当前消息的 UIMessage id（不能存 `MessageNode.id`，二者不是一回事）。`ChatErrorStore` 的 `StoredError` 带默认 false 的 `retryable` 和可空 `retryMessageId`，旧错误文件缺字段按 false/null 解码。`ErrorCard` 在 `retryable` 时显示 `Retry` 文本按钮，`retryEnabled` 在生成中、选择模式或等待工具审批时禁用。`ChatVM.retryError` 优先用 `retryMessageId`，没有时回退当前分支最后一条非压缩提示词的 USER 消息；目标 USER 之后如果已经有新的用户轮次，不启动重试（USER 重试会截断后续节点），保留卡片并提示对话已继续；否则通过 `getMessageNodeByMessageId` 校验目标还在，再调用带 `onStarted` 的 `regenerateAtMessage`，错误卡片只在目标确认并真正开始生成后才关闭，压缩中、审批中或目标被删时保留。四份 locale 新增 `chat_page_retry_error` 和 `chat_page_retry_stale`。
-- 理由：C61/C75/C76 只自动重试网络错误，次数用尽或遇到不可自动重试的失败后，错误卡片只能看和关，用户得自己重新发一遍；给生成失败卡片一个明确的重试入口，恢复失败的那一轮。
-- 合并注意：普通发送只在仍是最后正常用户轮次时重试，会截断该轮之后的失败回复；如果用户已经继续对话（目标 USER 之后有新的 USER 节点），不启动，保留卡片并提示对话已继续，不删除后续消息。重新生成重试的是当时的目标消息所在节点，保留该节点的备选回复，不是精确恢复到失败的工具 step；生成中的旧错误卡片按钮禁用，选择模式下也不启动，避免并发；错误卡片只在生成真正开始后关闭，生成被挡住或目标被删时卡片保留，并可能另出现一条“先停止生成”的通知；失败压缩对的提示词会被 `removeCompressionPairs` 清掉，目标在清理后不存在时不会静默关卡片；错误文件在 `noBackupFilesDir`，不进备份；不改 Room、Settings、备份或 `ai/`。
-- 测试：`ChatErrorStoreTest` 覆盖 `retryable`/`retryMessageId` 持久化往返和旧 JSON 缺字段默认 false/null；`RetryTargetMessageIdTest` 覆盖重新生成取节点当前消息 id、该 id 能被 `getMessageNodeByMessageId` 命中、普通发送回退最后用户、后续已有 USER 轮次时判定陈旧；全量 `:app:testGithubDebugUnitTest` 786 条，7 条既有 Windows 失败未变；assemble、spotless、markdownlint 通过。设备上无效 provider 失败后出现 `Message generation failed` 和 `Retry`，点击后错误卡片消失并重新进入生成；重试后再次失败的卡片和陈旧轮次守卫未等到，测试数据已恢复 168/61。
+- 现状：已撤销（2026-11-14）。`ChatError.retryable`、`retryMessageId`、`retryTargetMessageId`、`hasLaterUserTurn`、`ChatVM.retryError`、错误卡片上的 Retry 按钮、`ChatErrorStore` 的对应字段与 `ChatErrorStoreTest`/`RetryTargetMessageIdTest` 的相关用例都已删除；错误卡片只显示错误信息、复制与关闭。
+- 理由：重试语义依赖整条消息重放，和 C75 下线重试的决定一致；用户已习惯按轮判断后自己重新生成或让模型继续。
+- 合并注意：旧错误文件里的 `retryable`/`retryMessageId` 字段由 `JsonInstant` 的 `ignoreUnknownKeys` 忽略，`ChatErrorStoreTest` 有一条旧文件用例钉住；恢复重试时按新的消息模型重做，不要把旧字段直接搬回来。
+- 测试：`ChatErrorStoreTest` 的旧文件用例通过；`:app:testGithubDebugUnitTest` 全量通过。
 
 ### C78 工具失败日志分级
 

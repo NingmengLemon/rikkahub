@@ -173,7 +173,7 @@
 | `speech/` | C5 删掉了全部运行时实现，只留两个序列化类与它们的序列化测试 | 不看 |
 | `mediagen/` | C1 保留模块以维持数据兼容，界面不使用 | 不主动看，改到 `MediaGenerationProviderSetting` 这类持久化类型时复核 |
 
-`ai/` 下有这些改动：C3 删掉了 `ai/util/Request.kt` 里给 aihubmix.com 加 `APP-Code` 请求头的分支；C52 把 `ClaudeProvider` 的缓存断点收敛到官方标准；C53 把 Claude 缓存策略改成按 provider 切换，默认保留上游原来的 4 个断点；C47 在 `ai/ui/Message.kt` 新增了只读的 `contextLimitStart`，不改 `limitContext`；C51 在 `ai/ui/Message.kt` 新增了序列化字段 `isCompressionPrompt`，用于标记压缩提示词；C58 在 `ai/ui/Message.kt` 新增了 `status`、`isModelVisible`、`filterModelVisible` 和 `mergeAdjacentUserMessages`；C59 让五个 `StreamChunkDecoder` 在未见终止事件时抛 `IOException`，并在五个 provider 接线点的 `onClosed` 里 `close(e)`；C61 在 `ErrorParser.kt` 增加 `LlmFailureCode`/`HttpException` 错误码和 `Retry-After`，`RetryPolicy` 按码表、jitter 和 `maxDelay` 重试，`AgentLoop` 把空回复转成 `EMPTY_RESPONSE`；C62 给 `AgentRequest` 增加 `streamIdleTimeout`，`AgentLoop` 用 `Flow.timeout` 把流内空闲转成 `TIMEOUT`；C63 给 `AgentHooks` 增加 `onContextOverflow`，`AgentLoop` 捕获 `CONTEXT_WINDOW_EXCEEDED` 后允许 hook 缩窗重试一次；C65 让工具错误结果只带摘要，堆栈只进日志（C78 起 `Log.e`），并给 `AgentRequest` 增加 `toolTimeout`，`AgentLoop` 用 `withTimeoutOrNull` 执行工具；C78 把工具失败日志从 `printStackTrace` 改成 `Log.e`；C67 在 `UIMessage` 增加 `isGenerating`，加载时据此把进程死亡留下的半截回复补成 `INTERRUPTED`；C68 增加 `withoutCompressionScratch`，把压缩提示词和紧随回复从请求与导出里过滤掉；C85 让 Claude 的 `redacted_thinking` 与思考块签名可以回放；C86 在 `ReasoningLevel.OFF` 时不再写 `reasoning_effort`；C96 删掉了 `configureReferHeaders`（OpenRouter 的 `X-Title` 与 `HTTP-Referer`）。C35 的 `filterByKeywords` 与上游 `5ad19405` 逐字一致，不算分叉。移植上游对这些文件的改动时保留这些改动。
+`ai/` 下有这些改动：C3 删掉了 `ai/util/Request.kt` 里给 aihubmix.com 加 `APP-Code` 请求头的分支；C52 把 `ClaudeProvider` 的缓存断点收敛到官方标准；C53 把 Claude 缓存策略改成按 provider 切换，默认保留上游原来的 4 个断点；C47 在 `ai/ui/Message.kt` 新增了只读的 `contextLimitStart`，不改 `limitContext`；C51 在 `ai/ui/Message.kt` 新增了序列化字段 `isCompressionPrompt`，用于标记压缩提示词；C58 在 `ai/ui/Message.kt` 新增了 `status`、`isModelVisible`、`filterModelVisible` 和 `mergeAdjacentUserMessages`；C59 让五个 `StreamChunkDecoder` 在未见终止事件时抛 `IOException`，并在五个 provider 接线点的 `onClosed` 里 `close(e)`；C61 在 `ErrorParser.kt` 增加 `LlmFailureCode`/`HttpException` 错误码和 `Retry-After`，`RetryPolicy` 按码表、jitter 和 `maxDelay` 重试，`AgentLoop` 把空回复转成 `EMPTY_RESPONSE`；C62 给 `AgentRequest` 增加 `streamIdleTimeout`，`AgentLoop` 用 `Flow.timeout` 把流内空闲转成 `TIMEOUT`，Claude 的 ping 产出心跳并重置看门狗；C65 让工具错误结果只带摘要，堆栈只进日志（C78 起 `Log.e`），并给 `AgentRequest` 增加 `toolTimeout`，`AgentLoop` 用 `withTimeoutOrNull` 执行工具，工具声明 `timeoutMillis` 与外层取较大值；C78 把工具失败日志从 `printStackTrace` 改成 `Log.e`；C67 在 `UIMessage` 增加 `isGenerating`，加载时据此把进程死亡留下的半截回复补成 `INTERRUPTED`；C68 增加 `withoutCompressionScratch`，把压缩提示词和紧随回复从请求与导出里过滤掉；C85 让 Claude 的 `redacted_thinking` 与思考块签名可以回放；C86 在 `ReasoningLevel.OFF` 时不再写 `reasoning_effort`；C96 删掉了 `configureReferHeaders`（OpenRouter 的 `X-Title` 与 `HTTP-Referer`）。C35 的 `filterByKeywords` 与上游 `5ad19405` 逐字一致，不算分叉。移植上游对这些文件的改动时保留这些改动。
 
 上游从 3.0.0 起把多步生成循环放进 `ai/`（`ai/src/main/java/me/rerere/ai/agent/AgentLoop.kt`），3.1.1 又把工具执行计时与 models.dev 的模型能力数据放进去。现在还值得看 `ai/` 吗，取决于它是不是一块能单独参考的区域：如果它继续吸收 `app/` 侧的耦合，读改动的成本会变高。
 
@@ -293,7 +293,7 @@
 | C60 审批期间冻结 turn 上下文 | L3 | 无（审批 turn 上下文） |
 | C61 结构化失败与重试策略 | L3 | 无（错误分类与重试） |
 | C62 流式 idle watchdog | L3 | C61 |
-| C63 上下文超限自动缩窗 | L3 | C61 |
+| C63 上下文超限自动缩窗（已撤销） | L3 | C61 |
 | C64 移除设置页关于区域的社区与文档入口 | L3 | 无（设置页 UI） |
 | C65 工具中断恢复结果 | L3 | 无（工具恢复） |
 | C66 消息队列恢复与回插 | L3 | 无（消息队列） |
@@ -303,11 +303,11 @@
 | C70 消息队列持久化 | L3 | 无（队列文件与恢复时序） |
 | C71 错误卡片持久化 | L3 | 无（错误卡片文件） |
 | C72 上下文压缩按 token 预算 | L3 | 无（压缩计划与请求参数） |
-| C73 发送前上下文裁剪 | L3 | 无（请求级裁剪） |
+| C73 发送前上下文裁剪（已撤销） | L3 | 无（请求级裁剪） |
 | C74 上下文水位与压缩建议 | L3 | 无（chat page banner） |
-| C75 自动重试次数可调 | L3 | 无（网络设置） |
-| C76 重试 attempt 可见化 | L3 | 无（会话内存状态与聊天列表卡片） |
-| C77 错误卡片重试本步 | L3 | 无（ChatError 与错误卡片） |
+| C75 自动重试次数可调（已下线） | L3 | 无（网络设置） |
+| C76 重试 attempt 可见化（已下线） | L3 | 无（会话内存状态与聊天列表卡片） |
+| C77 错误卡片重试本步（已撤销） | L3 | 无（ChatError 与错误卡片） |
 | C78 工具失败日志分级 | L3 | 无（ai/AgentLoop.kt） |
 | C79 本地导出默认包含工作区文件 | L2 | C29 |
 | C80 用量成功失败区分与官方 schema 裁剪 | L2 | C18、C30 |
@@ -344,6 +344,23 @@
 - RikkaHub 提供商残留已清理（C95）：上游 `0533acde` 删掉默认提供商后，本分支删掉 `assets/icons/rikkahub.svg`、`AIIconMatcher` 的 `rikka|auto` 分支、四份 `rikkahub_provider_description`，以及只给它用的空 `RikkaHubAPI` 与指向 `api.rikka-ai.com` 的 Retrofit 单例；`DEFAULT_AUTO_MODEL_ID` 改名 `DEFAULT_MODEL_ID` 并注明当前预置里没有对应模型（老设置里那个提供商的 auto 模型仍是这个 id）。搜索服务 `RikkaHubSearchService` 仍保留，但它的选项里 `displayName` 是 `RikkaHub`，同样走这个 matcher，图标回退成首字母
 - 发给 OpenRouter 的来源标识头已移除（C96）：`configureReferHeaders` 只在 host 是 `openrouter.ai` 时加 `X-Title` 与 `HTTP-Referer`，Referer 指官方站点，等于把本分支的调用算成官方 app；函数、十一处调用与 `mediagen` 生图那两行一并删掉，用户自定义请求头不受影响
 
+### 失败恢复与上下文的返工
+
+2026-11-14 本轮已落地：
+
+- 自动重试整体下线：`Settings.retryPolicy()` 恒返回 `RetryPolicy.NONE`；网络设置去掉自动重试开关与次数滑块；`NetworkSetting.maxRetries` 与已保存 JSON 保留；C76 的 attempt 卡片失去触发来源（代码保留）；C77 的错误卡片 Retry 撤销，错误卡片只提示错误信息。
+- C63 撤销：`AgentHooks.onContextOverflow`、`overflowWindow`、`shrinkActive`、`contextOverflowRetried` 与测试删除，超限只出错误卡片。
+- C73 撤销：`ContextPruning.kt`、`buildStep` 的裁剪调用与测试删除，请求装配不再隐式改写消息。
+- C62 补心跳与开关：Claude 的 ping 产出 `StreamChunk.Heartbeat` 重置看门狗，`NetworkSetting.streamIdleTimeoutEnabled` 可整条关闭。
+- C65 补设置：`AgentSetting` 增加工具超时（0 表示不限制）与 `workspace_shell` 默认/最大命令超时；工具声明 `timeoutMillis`，外层取较大值，不会先于工具自己的超时触发。
+
+仍挂起：
+
+- 重试恢复与消息模型 B 项：一次 turn 拆成每步一条助手消息，失败只标最后一步，尝试记录单独存；等本轮返工稳定后单独做。
+- C58 半途失败投影（未定）：整条 `FAILED` 会让已执行工具的副作用对模型不可见，需要和 C59、C61 一起定 part 级投影。过渡期由用户判断这一轮有没有重要工作或写操作，有就让模型接着做，没有就重新生成。
+- C86 思考强度（讨论中）：`OFF` 保留为明确关闭，新增 `NOTSET` 表示不发参数，OCR、翻译、标题、记忆这类内部调用改用 `NOTSET`；官方兼容导出把 `NOTSET` 归一化成 `OFF`，避免未知枚举让官方设置解码失败。deepseek 已支持 `reasoning_effort`，各家现状后续派子代理调研。
+- C87 OCR 文本归属（讨论中）：采用 `file_derivations` 派生表，`file_id` 指向 `managed_files.id`，`kind`、`text`、`producer`、`edited`、时间戳；Room 升到 v34，官方导出登记并裁掉这张表。附件管理入口待定，先做聊天里的就近入口。
+
 ### Markdown 渲染能力
 
 - HTML `<svg>` 支持已定：Web 正文保留静态 SVG，但改走显式 allowlist（`svg-schema.ts`）并限制尺寸，Android 正文继续不渲染（BetterText 丢弃），Android 侧以整条消息预览和 workspace 预览作为 SVG 入口。剩余可做项：Android 正文检测到 `<svg` 时给一个「打开预览」入口，而不是静默丢弃；workspace 相对资源引用（`<image href>`）目前没有解析。
@@ -356,16 +373,16 @@ DSH 对照版本 `dsh-v0.2.1-rc.5`（`b830ec950f`）。结论：DSH 也不做逐
 RikkaHub 现状：
 
 - 重试单位是 step，`withRetry` 失败后回到 `stepStart`，前面的 step 和工具结果保留；单步回复看起来就是整条重来。DSH 也是这个语义，不是 RikkaHub 独有。
-- C61 把失败归一化为 `HttpException`/`LlmFailure`：流式和非流式的 2xx 之外的响应都带 HTTP status、错误码和 `Retry-After`；默认只重试 `RATE_LIMIT`、`SERVER`、`TIMEOUT`、`TRANSPORT`、`EMPTY_RESPONSE`，鉴权、配额、非法请求和 context overflow 不重试。空回复现在按 `EMPTY_RESPONSE` 进入同一策略，最多重试 `maxRetries` 次；默认 3 次，C75 起网络设置可调 0..10，基础间隔 1s/2s/4s，10% jitter，`Retry-After` 会被 `maxDelay` 截断；开关和次数仍是全局的。`retryOn` 保留为自定义逃生口。
+- C61 把失败归一化为 `HttpException`/`LlmFailure`：流式和非流式的 2xx 之外的响应都带 HTTP status、错误码和 `Retry-After`；默认只重试 `RATE_LIMIT`、`SERVER`、`TIMEOUT`、`TRANSPORT`、`EMPTY_RESPONSE`，鉴权、配额、非法请求和 context overflow 不重试。空回复现在按 `EMPTY_RESPONSE` 归入同一策略。C75 曾把重试次数放到网络设置，现已整体下线：`Settings.retryPolicy()` 恒返回 `RetryPolicy.NONE`，字段与已保存 JSON 保留；基础退避与 `Retry-After` 的实现都还在。`retryOn` 保留为自定义逃生口。
 - C58 已给失败和用户停止的回复加 `FAILED`/`INTERRUPTED` 状态；请求组装、标题生成、记忆整理和 `read_conversations` 都过滤 `FAILED`，失败半截不会再作为普通回复进入下一轮。多步工具调用在中途失败时仍按整条消息隔离。
 - 停止或下一次发送时，未执行工具补恢复结果，按 `startedAt` 区分 `not_started`/`outcome_unknown`；审批恢复路径中的 Approved/Denied/Answered 工具仍交给 AgentLoop 继续执行。
-- UI 有失败/中断标记；C76 已补 attempt 行和倒计时，C77 已补错误卡片重试按钮；C80 给 `usage_record` 加 outcome，失败成本保留、缓存命中率排除失败。
+- UI 有失败/中断标记；C76 的 attempt 行与 C77 的错误卡片重试都已下线，错误卡片只提示错误信息；C80 给 `usage_record` 加 outcome，失败成本保留、缓存命中率排除失败。
 
 待办：
 
 - P0 失败 attempt 与成功消息分开：C58 已实现 `UIMessage.status` 标记、`FAILED` 消息从请求/标题/记忆/`read_conversations` 过滤、相邻 user 合并和 UI 失败/中断标签。剩余：多步工具调用在中途失败时目前整条隔离，per-step attempt 细化仍归 P2；工具恢复结果已由 C65 处理。
-- P1 稳定错误码与可配置策略。C61 已把 provider 非 2xx 和空回复统一成带 `code`、`status`、`retryAfterMs` 的失败类型，覆盖 `AUTH`、`QUOTA`、`RATE_LIMIT`、`SERVER`、`TIMEOUT`、`EMPTY_RESPONSE`、`CONTEXT_WINDOW_EXCEEDED`、`INVALID_REQUEST`、`UNKNOWN`；裸传输错误仍按 `IOException` 重试，`TRANSPORT` 留给调用方包装。策略是 normal mode：`maxRetries`、`retryableCodes`、`initialDelay`、`maxDelay`、`jitter`；默认只重试瞬时错误，读取 `Retry-After` 并设上限；C75 起 `maxRetries` 由 `NetworkSetting` 可调 0..10，默认 3，其余参数仍固定。保留 step 级重试，不做 prefill 续写。验收：429、5xx、空回复可重试；400、401、403、额度、上下文超限不重试；用户停止可取消等待；重试不重复工具副作用；重试请求与前缀缓存兼容。
-- P2 重试状态 UI。C75 已让自动重试次数可调，C76 在聊天列表加入 attempt 卡片：编号、失败原因、等待秒数和倒计时；C77 给生成失败卡片加手动重试，普通发送只在仍是最后正常用户轮次时回到该轮，已经继续对话时保留卡片并提示，不截断后续；重新生成回到当时的目标消息。剩余：把失败 attempt 与成功后内容一起展示。
+- P1 稳定错误码与可配置策略。C61 已把 provider 非 2xx 和空回复统一成带 `code`、`status`、`retryAfterMs` 的失败类型，覆盖 `AUTH`、`QUOTA`、`RATE_LIMIT`、`SERVER`、`TIMEOUT`、`EMPTY_RESPONSE`、`CONTEXT_WINDOW_EXCEEDED`、`INVALID_REQUEST`、`UNKNOWN`；裸传输错误仍按 `IOException` 重试，`TRANSPORT` 留给调用方包装。策略是 normal mode：`maxRetries`、`retryableCodes`、`initialDelay`、`maxDelay`、`jitter`；默认只重试瞬时错误，读取 `Retry-After` 并设上限；C75 曾把 `maxRetries` 放到网络设置，现已下线：`Settings.retryPolicy()` 恒返回 `RetryPolicy.NONE`，字段与已保存 JSON 保留。保留 step 级重试的实现，不做 prefill 续写。验收：429、5xx、空回复可重试；400、401、403、额度、上下文超限不重试；用户停止可取消等待；重试不重复工具副作用；重试请求与前缀缓存兼容。
+- P2 重试状态 UI。C75 与 C76 已下线：网络设置入口与 attempt 卡片不再出现，代码保留；C77 的错误卡片 Retry 已撤销，错误卡片只提示错误信息。恢复时机见「失败恢复与上下文的返工」。
 - P3 用量区分成功与失败 attempt。C80 已给 `usage_record` 加 `outcome`（SUCCESS/FAILED/CANCELLED/UNKNOWN，旧数据 UNKNOWN），失败成本保留、统计页缓存命中率排除 FAILED/CANCELLED；消息卡片继续只显示成功 attempt 的 usage。attempt/retryId 没有单独落列，按 outcome 收口。验收：Room 32 到 33 迁移、旧数据默认 UNKNOWN、真实 app 库迁移、data.sync 53 条和官方导出裁剪都通过。32 到 33 没有降级迁移，回退旧构建前要保留 v32 库副本或继续用新构建。
 
 ### DSH 对照检查记录
@@ -378,13 +395,13 @@ RikkaHub 现状：
 | P1 | 停止的 pending 结算不保证执行（C59 已修） | C59 前 `stopGeneration` 先 pause/cancelJobs，再 join，join 后才 `finishInterruptedPendingTools`，不在 `NonCancellable`；页面退出导致 join 取消时 pending 工具不结算。C59 起 join 与工具收尾放进 `withContext(NonCancellable)`，发送前的 `finishInterruptedPendingTools` 仍保留作崩溃补偿。`ChatService.kt:1481-1493`、`ChatVM.kt:386-390`。 | 已按此实现；NonCancellable 只包 join 和工具收尾，不包 UI 状态。 |
 | P1 | 分支切换绕过审批门禁（C60 已修） | C60 前 `selectMessageNode` 只挡压缩，不挡审批；切走分支后 `isAwaitingToolApproval` 变 false，队列可派发，pending 调用留在未选中分支。C60 起 `isAwaitingToolApproval` 或 `pendingApprovalTurn` 非空时直接抛 `ConflictException`。`ChatService.selectMessageNode`、`Conversation.isAwaitingToolApproval`。 | 已按此实现；ChatVM 目前只记日志，Web 返回 409。 |
 | P1 | 审批恢复重新解析配置（C60 已修） | C60 前审批期间 `setChatModel` 没有门禁，`handleToolApproval` 恢复时重新 `runTurn`/`createContext`，工具结果和工具 schema 会落到新模型/provider。C60 起 `ConversationSession.pendingApprovalTurn` 冻结本轮 `ChatTurnContext`，审批恢复复用它；配置变化从下一轮生效。`ChatService.runTurn`、`ConversationSession.pendingApprovalTurn`；`ChatVM.setChatModel` 没有改，允许改但只影响下一轮。 | 已按此实现；冻结只在内存，进程死亡后退化为当前配置。 |
-| P1 | 没有流内 idle watchdog（C62 已修） | C62 前只有 OkHttp/Ktor 的 10 分钟 per-read timeout；无 chunk 无心跳会卡 10 分钟，有 SSE 心跳时 read timeout 被不断重置，可能永久停在生成中。C62 起 `AgentRequest.streamIdleTimeout` 默认 90 秒，`AgentLoop.stream` 用 `Flow.timeout` 在相邻 chunk 间超时，抛 `LlmFailure(TIMEOUT)` 进重试；用户取消仍优先传播。`AgentLoop.kt`、`Agent.kt`。 | 已按此实现；默认值目前没有设置页入口，非流式仍依赖网络层读超时。 |
-| P1 | 没有 error-driven overflow 恢复（C63 已修） | C63 前请求装配只有 `limitContext` 的条数截断，provider 返回 overflow 直接进错误卡片，压缩只能手动触发。C63 起 C61 归一化 `CONTEXT_WINDOW_EXCEEDED`，`AgentHooks.onContextOverflow` 让 app 把窗口收到最后一条 user 后，并在每个后续 step 按当前消息重算，再从本 step 重试；仍失败才出卡片。`AgentLoop.kt`、`Agent.kt`、`ChatRequestFactory.kt`。 | 已按此实现；不做自动压缩，单条超大输入仍可能失败。 |
-| P2 | 工具恢复语义失真（C65 已修恢复结果） | C65 起按 `startedAt` 区分 `not_started` 与 `outcome_unknown`，`cancelInterruptedTools` 和 `withoutUnresumableToolCalls` 共用恢复结果；工具错误只给模型摘要，堆栈只进日志；`AgentRequest.toolTimeout` 默认 5 分钟，超时返回可读结果。C78 把堆栈改用 `Log.e`；output 的 NonCancellable 写入仍受 FlowCollector 跨协程发射限制，需要 channelFlow 或单独回调，留后续。`ConversationMessages.kt`、`Conversation.kt`、`AgentLoop.kt`。 | 已按恢复语义和工具超时实现；日志分级已完成，取消写入待后续。 |
+| P1 | 没有流内 idle watchdog（C62 已加，含心跳与开关） | C62 前只有 OkHttp/Ktor 的 10 分钟 per-read timeout；无 chunk 无心跳会卡 10 分钟，有 SSE 心跳时 read timeout 被不断重置，可能永久停在生成中。C62 起 `AgentRequest.streamIdleTimeout` 默认 90 秒，`AgentLoop.stream` 用 `Flow.timeout` 在相邻 chunk 间超时；Claude 的 ping 解码成 `StreamChunk.Heartbeat` 重置看门狗，`NetworkSetting.streamIdleTimeoutEnabled` 可以整条关掉。`AgentLoop.kt`、`Agent.kt`、`ClaudeStreamDecoder.kt`。 | 已按此实现；自动重试下线期间超时直接出错误卡片。 |
+| P1 | 没有 error-driven overflow 恢复（C63 已撤销） | C63 曾用 `AgentHooks.onContextOverflow` 把窗口缩到最后一条 user 后重试，但它静默丢掉整段历史且每轮重演，已撤销：hook、`overflowWindow`、`shrinkActive` 与相关测试都删除，超限只按 `CONTEXT_WINDOW_EXCEEDED` 出错误卡片。`AgentLoop.kt`、`Agent.kt`、`ChatRequestFactory.kt`。 | 已按撤销处理；是否恢复等失败恢复与消息模型重做。 |
+| P2 | 工具恢复语义失真（C65 已修恢复结果与超时设置） | C65 起按 `startedAt` 区分 `not_started` 与 `outcome_unknown`，`cancelInterruptedTools` 和 `withoutUnresumableToolCalls` 共用恢复结果，逐 part 保留文本与推理；工具错误只给模型摘要，堆栈只进日志（C78 起 `Log.e`）。工具声明 `timeoutMillis`，外层 `AgentSetting.toolTimeoutSeconds`（0 表示不限制）与它取较大值；`workspace_shell` 的默认与最大命令超时也进设置。output 的 NonCancellable 写入仍受 FlowCollector 跨协程发射限制，留后续。 | 已按恢复语义、超时设置与声明超时实现；日志分级已完成，取消写入待后续。 |
 | P2 | `withoutUnresumableToolCalls` 删除整条消息（C65 已修） | C65 起逐 part 处理，只把不可恢复的 Tool part 换成恢复结果，保留文本、推理和其它 part，不再删除整条 assistant 消息。`Conversation.kt`。 | 已按此实现。 |
 | P2 | 进程死亡丢失重试与收尾状态（C67 已恢复半截回复，C70 已持久化队列，C71 已持久化错误卡片） | 只周期保存回复节点，5/15/30 秒分档，小节点最迟 60 秒；C67 的 `isGenerating` 随消息落库，加载时把半截回复补成 `INTERRUPTED` 并补工具结果；C70 把未出队消息落到 `noBackupFilesDir`，恢复为暂停态；C71 把错误卡片落到 `noBackupFilesDir`，启动时恢复。实时 `Retrying (n/m)` 状态仍不跨进程：进程死亡后没有在途请求，半截回复按 `INTERRUPTED` 恢复，重试倒计时恢复出来只会误导；首次保存前死亡仍会丢。C50 在节点漂移或含 base64 图片时静默跳过。`MessageSaveLoop.kt`、`ConversationSession.kt`、`ChatService.kt`、`ChatErrorStore.kt`。 | 继续持久化 turn 状态或时间戳心跳；保存失败要上报；live retrying 不跨进程，重试 attempt 的 UI 与用量归 P2 重试状态项。 |
 | P2 | 消息队列暂停后静默滞留（C66 已修派发与回插，C70 已持久化） | C66 前队列 paused 且非空时，新消息只 enqueue，`takeNext` 因 paused 返回 null，消息不发也不进正文；先 `takeNext` 出队再写历史，中间失败会丢消息。C66 起显式发送总是 resume，发送失败且未落库时回插队首。C70 起未出队消息按会话落到 `noBackupFilesDir`，恢复为暂停态，用队列 id 与已落库消息去重。`ChatService.kt`、`MessageQueue.kt`、`MessageQueueStore.kt`。 | 已按此实现派发恢复、失败回插和跨进程持久化；编辑占位与暂停状态不落盘。 |
-| P2 | 上下文压力与压缩管理（C72/C73/C74 已修） | C72 前发送前没有 token 估算或 usage 水位；摘要请求 `maxTokens = null`，截断即整次压缩失败；没有 tool result 裁剪和图片 offload；截断 keep=1 且末条是 assistant 时会丢掉产生它的 user。C72 起保留起点按 user 轮次对齐，摘要输出和输入都有保守 token 预算，超预算先提示截断/多保留，摘要被截断时退回部分摘要；C73 起 `buildStep` 对旧工具输出截断到前 2000 字符、旧图片换占位，最近 6 条不动，仍超预算交给 C63；C74 起当前窗口最近 usage 加尾部估算，达到 80% 在主聊天页底部显示压缩建议条，手动打开管理上下文，不自动压缩。`ChatRequestFactory.kt`、`ContextPruning.kt`、`CompressionPlan.kt`、`ContextPressure.kt`、`ChatPage.kt`、`ChatService.kt`。 | 剩余自动压缩仍不做；C72/C73/C74 已做计划对齐、摘要预算、部分摘要、范围检查、tool result 截断、图片占位和 usage 水位建议。 |
+| P2 | 上下文压力与压缩管理（C72/C74 已做，C73 已撤销） | C72 前发送前没有 token 估算或 usage 水位；摘要请求 `maxTokens = null`，截断即整次压缩失败；截断 keep=1 且末条是 assistant 时会丢掉产生它的 user。C72 起保留起点按 user 轮次对齐，摘要输出和输入都有保守 token 预算，超预算先提示截断/多保留，摘要被截断时退回部分摘要；C74 起当前窗口最近 usage 加尾部估算，达到 80% 在主聊天页底部显示压缩建议条，手动打开管理上下文，不自动压缩。C73 的发送前裁剪已撤销（静默改写请求、破坏消息段前缀缓存），超限只出错误卡片。`ChatRequestFactory.kt`、`CompressionPlan.kt`、`ContextPressure.kt`、`ChatPage.kt`、`ChatService.kt`。 | 自动压缩仍不做；C73 已撤销，C72/C74 的预算与水位保留。 |
 | P2 | scratch 生命周期只靠调用点清理（C68 已清理崩溃对并过滤请求/导出/Web 快照/搜索） | 压缩失败或取消留下的 prompt 与半截回复只在发送、截断、再次压缩前清理；C68 起加载会话时删除回复仍为 `COMPLETE` 的崩溃对，失败/取消对标 `FAILED` 后跨 reload 保留，请求派生、导出、Web/SSE 的 `Conversation.toDto` 和 App/Web/agent 搜索结果会过滤；浮动窗口只预览当前回复，压缩轮次结束即清空，不列出孤儿对。`ChatService.kt`、`ConversationSession.kt`、`ConversationMessages.kt`、`ConversationRepository.kt`、`ai/ui/Message.kt`。 | 给 scratch 打逐 part 不可发送标记；C68 已做崩溃对载入清理、请求/导出/Web 快照/搜索过滤。 |
 
 修复顺序：
